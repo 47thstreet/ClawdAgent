@@ -608,8 +608,8 @@ If they want to check a running project, use "status" with projectName.`,
 
       // Empty response fallback — don't send blank messages
       if (!response.content || response.content.trim().length === 0) {
-        logger.warn('AI returned empty response, using fallback', { agent: agent.id, provider: response.provider });
-        response.content = 'קיבלתי את ההודעה שלך אבל לא הצלחתי לעבד אותה. נסה שוב או נסח אחרת 🔄';
+        logger.warn('AI returned empty response, using fallback', { agent: agent.id, intent: routing.intent, provider: response.provider });
+        response.content = `\u05E7\u05D9\u05D1\u05DC\u05EA\u05D9 \u05D0\u05EA \u05D4\u05D4\u05D5\u05D3\u05E2\u05D4 \u05E9\u05DC\u05DA \u05D0\u05D1\u05DC \u05DC\u05D0 \u05D4\u05E6\u05DC\u05D7\u05EA\u05D9 \u05DC\u05E2\u05D1\u05D3 \u05D0\u05D5\u05EA\u05D4. \u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1 \u05D0\u05D5 \u05E0\u05E1\u05D7 \u05D0\u05D7\u05E8\u05EA \u{1F504}\n[\u05E1\u05D5\u05DB\u05DF: ${agent.name} | \u05DB\u05D5\u05D5\u05E0\u05D4: ${routing.intent}]`;
       }
 
       // Track usage for cost monitoring
@@ -667,7 +667,23 @@ If they want to check a running project, use "status" with projectName.`,
 
     } catch (error: any) {
       logger.error('Engine processing error', { error: error.message, stack: error.stack });
-      return { text: '❌ Something went wrong. Try again.', format: 'text' };
+
+      // Specific Hebrew error messages per error type
+      let errorMsg: string;
+      const msg = error.message ?? '';
+      if (msg.includes('ECONNREFUSED') || msg.includes('ETIMEOUT') || msg.includes('ENETUNREACH')) {
+        errorMsg = '\u{274C} \u05D1\u05E2\u05D9\u05D4 \u05D1\u05D7\u05D9\u05D1\u05D5\u05E8 \u05DC\u05E9\u05E8\u05EA. \u05D1\u05D3\u05D5\u05E7 \u05E9\u05D4\u05E9\u05E8\u05EA \u05E4\u05E2\u05D9\u05DC \u05D5\u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1.';
+      } else if (msg.includes('rate limit') || msg.includes('429') || msg.includes('quota')) {
+        errorMsg = '\u{26A0}\uFE0F \u05D4\u05D2\u05E2\u05EA\u05D9 \u05DC\u05DE\u05D2\u05D1\u05DC\u05EA \u05E7\u05E6\u05D1 \u05E9\u05DC \u05D4-API. \u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1 \u05D1\u05E2\u05D5\u05D3 \u05D3\u05E7\u05D4.';
+      } else if (msg.includes('401') || msg.includes('403') || msg.includes('authentication') || msg.includes('unauthorized')) {
+        errorMsg = '\u{1F510} \u05D1\u05E2\u05D9\u05D4 \u05D1\u05D4\u05E8\u05E9\u05D0\u05D5\u05EA. \u05D1\u05D3\u05D5\u05E7 \u05E9\u05DE\u05E4\u05EA\u05D7\u05D5\u05EA \u05D4-API \u05EA\u05E7\u05D9\u05E0\u05D9\u05DD.';
+      } else if (msg.includes('timeout') || msg.includes('RESPONSE_TIMEOUT')) {
+        errorMsg = '\u{23F3} \u05D4\u05E4\u05E2\u05D5\u05DC\u05D4 \u05DC\u05E7\u05D7\u05D4 \u05D9\u05D5\u05EA\u05E8 \u05DE\u05D3\u05D9. \u05E0\u05E1\u05D4 \u05DC\u05E4\u05E9\u05D8 \u05D0\u05EA \u05D4\u05D1\u05E7\u05E9\u05D4.';
+      } else {
+        errorMsg = `\u{274C} \u05DE\u05E9\u05D4\u05D5 \u05D4\u05E9\u05EA\u05D1\u05E9. \u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1.\n\u05E9\u05D2\u05D9\u05D0\u05D4: ${msg.slice(0, 150)}`;
+      }
+
+      return { text: errorMsg, format: 'text' };
     }
   }
 }

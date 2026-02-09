@@ -583,22 +583,22 @@ export function getToolDefinitions(allowedTools: string[]): any[] {
 
 // Per-tool timeout limits (ms) — prevents a stuck tool from blocking everything
 const TOOL_TIMEOUTS: Record<string, number> = {
-  'bash': 60000,          // 60s — commands can be slow
-  'claude-code': 120000,  // 120s — Claude Code CLI can take time
-  'browser': 60000,       // 60s — page loads + rendering
+  'bash': 180000,         // 3min — SSH commands and complex ops can be slow
+  'claude-code': 300000,  // 5min — Claude Code CLI can take time for agentic tasks
+  'browser': 120000,      // 2min — page loads + rendering + JS execution
   'search': 30000,        // 30s — web search
   'github': 30000,        // 30s — API calls
   'email': 30000,         // 30s — Gmail API
-  'kie': 60000,           // 60s — AI generation polling
+  'kie': 300000,          // 5min — video/image generation can take a while
   'social': 30000,        // 30s — social media API
-  'openclaw': 30000,      // 30s — bridge call
-  'auto': 300000,         // 5min — multi-step autonomous
-  'device': 30000,         // 30s — ADB/Appium commands
-  'elevenlabs': 60000,    // 60s — TTS/audio generation
-  'firecrawl': 60000,     // 60s — crawling can be slow
+  'openclaw': 60000,      // 1min — bridge call (agent mode can be slow)
+  'auto': 600000,         // 10min — multi-step autonomous
+  'device': 60000,        // 1min — ADB/Appium commands
+  'elevenlabs': 120000,   // 2min — TTS/podcast/audio generation
+  'firecrawl': 120000,    // 2min — crawling can be slow
   'rapidapi': 30000,      // 30s — API calls
-  'apify': 180000,        // 3min — actor runs can take time
-  'ssh': 120000,           // 2min — scans can take time
+  'apify': 300000,        // 5min — actor runs can take time
+  'ssh': 300000,          // 5min — scans and workflows can take time
 };
 const DEFAULT_TOOL_TIMEOUT = 30000; // 30s default
 

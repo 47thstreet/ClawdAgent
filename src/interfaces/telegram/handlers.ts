@@ -288,6 +288,22 @@ export function setupHandlers(bot: Bot, engine: Engine) {
       await ctx.reply(msg).catch(() => {});
     }, PROGRESS_INTERVAL);
 
+    // ── Context-aware "thinking" message based on keywords ──
+    const lowerText = ctx.message.text.toLowerCase();
+    let thinkingMsg = '';
+    if (/search|חפש|תחפש|google|מצא|find/i.test(lowerText)) thinkingMsg = '\u{1F50D} \u05DE\u05D7\u05E4\u05E9...';
+    else if (/image|תמונה|צייר|draw|generate.*image|תיצור.*תמונה/i.test(lowerText)) thinkingMsg = '\u{1F3A8} \u05DE\u05D9\u05D9\u05E6\u05E8 \u05EA\u05DE\u05D5\u05E0\u05D4...';
+    else if (/video|וידאו|סרטון|תיצור.*וידאו|clip/i.test(lowerText)) thinkingMsg = '\u{1F3AC} \u05DE\u05D9\u05D9\u05E6\u05E8 \u05D5\u05D9\u05D3\u05D0\u05D5...';
+    else if (/music|שיר|מוזיקה|song|audio/i.test(lowerText)) thinkingMsg = '\u{1F3B5} \u05DE\u05D9\u05D9\u05E6\u05E8 \u05DE\u05D5\u05D6\u05D9\u05E7\u05D4...';
+    else if (/publish|פרסם|tweet|post|story|share/i.test(lowerText)) thinkingMsg = '\u{1F4E4} \u05DE\u05E4\u05E8\u05E1\u05DD...';
+    else if (/server|שרת|deploy|דפלוי|ssh|docker/i.test(lowerText)) thinkingMsg = '\u{1F5A5}\uFE0F \u05DE\u05EA\u05D7\u05D1\u05E8 \u05DC\u05E9\u05E8\u05EA...';
+    else if (/email|מייל|gmail|inbox/i.test(lowerText)) thinkingMsg = '\u{1F4E7} \u05D1\u05D5\u05D3\u05E7 \u05DE\u05D9\u05D9\u05DC\u05D9\u05DD...';
+    else if (/code|קוד|github|pr|bug|fix/i.test(lowerText)) thinkingMsg = '\u{1F4BB} \u05E2\u05D5\u05D1\u05D3 \u05E2\u05DC \u05E7\u05D5\u05D3...';
+    else if (/scrape|crawl|site|אתר|analyze|תנתח/i.test(lowerText)) thinkingMsg = '\u{1F310} \u05E1\u05D5\u05E8\u05E7 \u05D0\u05EA\u05E8...';
+    if (thinkingMsg) {
+      await ctx.reply(thinkingMsg).catch(() => {});
+    }
+
     // Start engine processing — keep promise reference for background delivery
     const processPromise = engine.process(incoming);
     let response: Awaited<ReturnType<typeof engine.process>>;
@@ -322,15 +338,7 @@ export function setupHandlers(bot: Bot, engine: Engine) {
             const header = `\u{2705} \u05E1\u05D9\u05D9\u05DE\u05EA\u05D9! (\u05DC\u05E7\u05D7 ${elapsed} \u05E9\u05E0\u05D9\u05D5\u05EA)\n\n`;
             const fullText = header + bgResult.text;
 
-            const maxLen = 4000;
-            if (fullText.length <= maxLen) {
-              await ctx.reply(fullText, { parse_mode: 'Markdown' }).catch(() => ctx.reply(fullText));
-            } else {
-              const chunks = splitMessage(fullText, maxLen);
-              for (const chunk of chunks) {
-                await ctx.reply(chunk, { parse_mode: 'Markdown' }).catch(() => ctx.reply(chunk));
-              }
-            }
+            await sendResponseWithMedia(ctx, fullText);
           })
           .catch((bgErr) => {
             logger.error('Background processing failed', { error: bgErr.message });
@@ -358,15 +366,7 @@ export function setupHandlers(bot: Bot, engine: Engine) {
       response.text = '\u{1F914} I processed your request but had nothing to say. Try asking differently.';
     }
 
-    const maxLen = 4000;
-    if (response.text.length <= maxLen) {
-      await ctx.reply(response.text, { parse_mode: 'Markdown' }).catch(() => ctx.reply(response.text));
-    } else {
-      const chunks = splitMessage(response.text, maxLen);
-      for (const chunk of chunks) {
-        await ctx.reply(chunk, { parse_mode: 'Markdown' }).catch(() => ctx.reply(chunk));
-      }
-    }
+    await sendResponseWithMedia(ctx, response.text);
   });
 
   // Voice messages → Whisper transcription → Engine
@@ -512,6 +512,89 @@ export function setupHandlers(bot: Bot, engine: Engine) {
       await ctx.reply('Document processing failed: ' + err.message);
     }
   });
+}
+
+// ── Media URL detection & sending ──────────────────────────────────
+// Detects image/video/audio URLs in response text and sends them as native Telegram media.
+
+const MEDIA_URL_REGEX = /https?:\/\/[^\s"'<>)]+\.(jpg|jpeg|png|gif|webp|bmp|mp4|webm|mov|avi|mp3|ogg|wav|m4a|aac|flac)(\?[^\s"'<>)]*)?/gi;
+const IMAGE_EXTS = /\.(jpg|jpeg|png|gif|webp|bmp)(\?|$)/i;
+const VIDEO_EXTS = /\.(mp4|webm|mov|avi)(\?|$)/i;
+const AUDIO_EXTS = /\.(mp3|ogg|wav|m4a|aac|flac)(\?|$)/i;
+
+async function sendResponseWithMedia(
+  ctx: any,
+  text: string,
+  parseMode: 'Markdown' | 'HTML' | undefined = 'Markdown',
+): Promise<void> {
+  // Extract all media URLs
+  const mediaUrls = [...new Set(text.match(MEDIA_URL_REGEX) || [])];
+
+  if (mediaUrls.length === 0) {
+    // No media — plain text send
+    await sendTextChunked(ctx, text, parseMode);
+    return;
+  }
+
+  // Remove media URLs from text body (they'll be sent as native media)
+  let cleanText = text;
+  for (const url of mediaUrls) {
+    cleanText = cleanText.replace(url, '').replace(/\[.*?\]\(\s*\)/, ''); // remove empty markdown links
+  }
+  cleanText = cleanText.replace(/\n{3,}/g, '\n\n').trim();
+
+  // Send each media item as native Telegram media
+  for (const url of mediaUrls.slice(0, 5)) { // Max 5 media items
+    try {
+      if (IMAGE_EXTS.test(url)) {
+        const caption = mediaUrls.length === 1 && cleanText.length <= 1024 ? cleanText : undefined;
+        await ctx.replyWithPhoto(url, {
+          caption,
+          parse_mode: caption ? parseMode : undefined,
+        });
+        if (caption) cleanText = ''; // Caption was sent with the image
+      } else if (VIDEO_EXTS.test(url)) {
+        const caption = mediaUrls.length === 1 && cleanText.length <= 1024 ? cleanText : undefined;
+        await ctx.replyWithVideo(url, {
+          caption,
+          parse_mode: caption ? parseMode : undefined,
+        });
+        if (caption) cleanText = '';
+      } else if (AUDIO_EXTS.test(url)) {
+        const caption = mediaUrls.length === 1 && cleanText.length <= 1024 ? cleanText : undefined;
+        await ctx.replyWithAudio(url, {
+          caption,
+          parse_mode: caption ? parseMode : undefined,
+        });
+        if (caption) cleanText = '';
+      }
+    } catch (mediaErr: any) {
+      // If media send fails, fall back to sending URL as text
+      logger.debug('Media send failed, falling back to text', { url: url.slice(0, 80), error: mediaErr.message });
+      cleanText += `\n${url}`;
+    }
+  }
+
+  // Send remaining text if any
+  if (cleanText.trim().length > 0) {
+    await sendTextChunked(ctx, cleanText, parseMode);
+  }
+}
+
+async function sendTextChunked(
+  ctx: any,
+  text: string,
+  parseMode: 'Markdown' | 'HTML' | undefined = 'Markdown',
+): Promise<void> {
+  const maxLen = 4000;
+  if (text.length <= maxLen) {
+    await ctx.reply(text, { parse_mode: parseMode }).catch(() => ctx.reply(text));
+  } else {
+    const chunks = splitMessage(text, maxLen);
+    for (const chunk of chunks) {
+      await ctx.reply(chunk, { parse_mode: parseMode }).catch(() => ctx.reply(chunk));
+    }
+  }
 }
 
 function splitMessage(text: string, maxLen: number): string[] {
