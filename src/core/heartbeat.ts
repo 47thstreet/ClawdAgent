@@ -508,6 +508,20 @@ export class Heartbeat {
             }
 
             if (text) {
+              // Filter out heartbeat/cron noise — don't spam Telegram with these
+              const lowerText = text.toLowerCase();
+              const isNoise =
+                /^(heartbeat|ping|pong|health.?check|alive|ok|running|status.?ok)$/i.test(text.trim()) ||
+                lowerText.includes('heartbeat') ||
+                lowerText.includes('health check passed') ||
+                lowerText.includes('cron completed successfully') ||
+                lowerText.includes('no new messages') ||
+                lowerText.includes('nothing to report') ||
+                (lowerText.includes('cron') && lowerText.includes('ok') && text.length < 50) ||
+                text.trim().length < 5;
+
+              if (isNoise) continue;
+
               const sessionLabel = session.key.includes('cron:')
                 ? `cron ${session.displayName || session.key.split(':').pop()?.slice(0, 8)}`
                 : session.displayName || session.key.split(':').pop() || 'main';

@@ -3,6 +3,7 @@ import { Engine, IncomingMessage } from '../../core/engine.js';
 import config from '../../config.js';
 import logger from '../../utils/logger.js';
 import { getOpenClawMessageContext, getOpenClawExecutor } from '../web/routes/webhook.js';
+import { executeTool, initTools } from '../../core/tool-executor.js';
 
 export function setupHandlers(bot: Bot, engine: Engine) {
   // Admin-only guard — if TELEGRAM_ADMIN_IDS is set, only those users can interact
@@ -32,7 +33,17 @@ export function setupHandlers(bot: Bot, engine: Engine) {
 
   bot.command('help', async (ctx) => {
     await ctx.reply(
-      `📚 **ClawdAgent Commands**\n\n**General**: /start, /help, /status\n**Servers**: /servers, /deploy, /logs\n**Code**: /code, /pr, /review\n**Search**: /search, /ask\n**Tasks**: /tasks, /todo, /remind\n**Settings**: /settings, /provider\n\n🔌 /provider — View/switch AI provider mode\n\n💡 Just type naturally!`,
+      `📚 **ClawdAgent Commands**\n\n` +
+      `**General**: /start, /help, /status, /provider\n` +
+      `**Servers**: /servers, /health, /uptime, /logs\n` +
+      `**Quick Ops**: /disk, /ram, /ps, /docker, /ports\n` +
+      `**OpenClaw**: /openclaw, /oc\n` +
+      `**Analytics**: /costs, /memory\n` +
+      `**Code**: /code, /pr, /review\n` +
+      `**Search**: /search, /ask\n` +
+      `**Tasks**: /tasks, /todo, /remind\n\n` +
+      `\u{26A1} Quick commands run instantly (no AI)\n` +
+      `\u{1F4AC} Or just type naturally!`,
       { parse_mode: 'Markdown' }
     );
   });
@@ -137,6 +148,102 @@ export function setupHandlers(bot: Bot, engine: Engine) {
           return;
         }
       }
+    }
+
+    // ── Direct slash commands — bypass AI entirely for instant responses ──
+    const trimmedText = ctx.message.text.trim();
+    const directCommand = trimmedText.split(/\s+/)[0].toLowerCase();
+    const directArg = trimmedText.slice(directCommand.length).trim();
+
+    const DIRECT_COMMANDS: Record<string, () => Promise<string | null>> = {
+      '/openclaw': async () => {
+        initTools();
+        if (directArg) {
+          // /openclaw <message> → send to OpenClaw agent
+          const r = await executeTool('openclaw', { action: 'agent', message: directArg, sessionKey: 'clawdagent-direct' });
+          return r.success ? `\u{1F990} OpenClaw:\n${r.output.slice(0, 3500)}` : `\u{274C} OpenClaw error: ${r.error}`;
+        }
+        const r = await executeTool('openclaw', { action: 'health' });
+        return r.success ? `\u{1F990} OpenClaw Health:\n${r.output.slice(0, 3000)}` : `\u{274C} OpenClaw: ${r.error || 'unreachable'}`;
+      },
+      '/oc': async () => DIRECT_COMMANDS['/openclaw']!(),
+      '/servers': async () => {
+        initTools();
+        const r = await executeTool('ssh', { action: 'list_servers' });
+        return r.success ? `\u{1F5A5}\uFE0F Servers:\n${r.output.slice(0, 3000)}` : `\u{274C} ${r.error}`;
+      },
+      '/health': async () => {
+        initTools();
+        const serverId = directArg || undefined;
+        const action = serverId ? 'health' : 'health_all';
+        const r = await executeTool('ssh', { action, ...(serverId ? { serverId } : {}) });
+        return r.success ? r.output.slice(0, 3500) : `\u{274C} ${r.error}`;
+      },
+      '/costs': async () => {
+        initTools();
+        const r = await executeTool('analytics', { action: 'cost' });
+        return r.success ? `\u{1F4B0} Cost Report:\n${r.output.slice(0, 3000)}` : `\u{274C} ${r.error}`;
+      },
+      '/memory': async () => {
+        initTools();
+        const r = await executeTool('memory', { action: 'stats', userId: String(ctx.from.id) });
+        return r.success ? `\u{1F9E0} Memory:\n${r.output.slice(0, 3000)}` : `\u{274C} ${r.error}`;
+      },
+      '/logs': async () => {
+        initTools();
+        const r = await executeTool('bash', { command: 'tail -50 /root/.clawdagent/logs/combined.log 2>/dev/null || tail -50 logs/combined.log 2>/dev/null || echo "No logs found"' });
+        return r.success ? `\u{1F4DC} Recent Logs:\n${r.output.slice(0, 3500)}` : `\u{274C} ${r.error}`;
+      },
+      // ── Quick server commands — common ops without AI overhead ──
+      '/disk': async () => {
+        initTools();
+        const sid = directArg || undefined;
+        const r = await executeTool(sid ? 'ssh' : 'bash', sid ? { action: 'exec', serverId: sid, command: 'df -h' } : { command: 'df -h' });
+        return r.success ? `\u{1F4C0} Disk Usage:\n\`\`\`\n${r.output.slice(0, 3000)}\n\`\`\`` : `\u{274C} ${r.error}`;
+      },
+      '/ram': async () => {
+        initTools();
+        const sid = directArg || undefined;
+        const r = await executeTool(sid ? 'ssh' : 'bash', sid ? { action: 'exec', serverId: sid, command: 'free -h' } : { command: 'free -h' });
+        return r.success ? `\u{1F4BE} Memory:\n\`\`\`\n${r.output.slice(0, 3000)}\n\`\`\`` : `\u{274C} ${r.error}`;
+      },
+      '/ps': async () => {
+        initTools();
+        const sid = directArg || undefined;
+        const r = await executeTool(sid ? 'ssh' : 'bash', sid ? { action: 'exec', serverId: sid, command: 'ps aux --sort=-%mem | head -15' } : { command: 'ps aux --sort=-%mem | head -15' });
+        return r.success ? `\u{1F4CB} Top Processes:\n\`\`\`\n${r.output.slice(0, 3000)}\n\`\`\`` : `\u{274C} ${r.error}`;
+      },
+      '/docker': async () => {
+        initTools();
+        const sid = directArg || undefined;
+        const r = await executeTool(sid ? 'ssh' : 'bash', sid ? { action: 'exec', serverId: sid, command: 'docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"' } : { command: 'docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"' });
+        return r.success ? `\u{1F433} Docker:\n\`\`\`\n${r.output.slice(0, 3000)}\n\`\`\`` : `\u{274C} ${r.error}`;
+      },
+      '/ports': async () => {
+        initTools();
+        const sid = directArg || undefined;
+        const r = await executeTool(sid ? 'ssh' : 'bash', sid ? { action: 'exec', serverId: sid, command: 'ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null' } : { command: 'ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null' });
+        return r.success ? `\u{1F310} Open Ports:\n\`\`\`\n${r.output.slice(0, 3000)}\n\`\`\`` : `\u{274C} ${r.error}`;
+      },
+      '/uptime': async () => {
+        initTools();
+        const sid = directArg || undefined;
+        const r = await executeTool(sid ? 'ssh' : 'bash', sid ? { action: 'exec', serverId: sid, command: 'uptime && echo "---" && uname -a' } : { command: 'uptime && echo "---" && uname -a' });
+        return r.success ? `\u{23F1}\uFE0F Uptime:\n${r.output.slice(0, 2000)}` : `\u{274C} ${r.error}`;
+      },
+    };
+
+    if (DIRECT_COMMANDS[directCommand]) {
+      try {
+        const result = await DIRECT_COMMANDS[directCommand]();
+        if (result) {
+          await ctx.reply(result, { parse_mode: 'Markdown' }).catch(() => ctx.reply(result));
+        }
+      } catch (err: any) {
+        logger.error('Direct command failed', { command: directCommand, error: err.message });
+        await ctx.reply(`\u{274C} Command failed: ${err.message}`).catch(() => {});
+      }
+      return;
     }
 
     // ── Normal message processing ──

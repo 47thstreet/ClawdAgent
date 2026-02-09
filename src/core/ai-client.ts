@@ -491,7 +491,7 @@ export class AIClient {
     const messages: Message[] = [...request.messages];
     let lastResponse: AIResponse | null = null;
     let iterations = 0;
-    const MAX_TOOL_ITERATIONS = request.maxToolIterations ?? 8;
+    const MAX_TOOL_ITERATIONS = request.maxToolIterations ?? 12;
     const toolsUsed: string[] = [];
 
     while (iterations < MAX_TOOL_ITERATIONS) {
