@@ -479,17 +479,39 @@ If they want to check a running project, use "status" with projectName.`,
       const trimmedHistory = trimHistoryToFit(history, 6000);
       const messages: Message[] = [...trimmedHistory, { role: 'user', content: incoming.text }];
 
-      // 8. Smart model selection — choose cheapest model that can handle the task
+      // 8. Smart model/provider selection
       const toolDefs = agentTools.length > 0 ? getToolDefinitions(agentTools) : [];
       const lastMsg = messages[messages.length - 1]?.content ?? '';
       const lastMsgStr = typeof lastMsg === 'string' ? lastMsg : '';
       const hasHebrew = /[\u0590-\u05FF]/.test(lastMsgStr);
 
       let selectedModelId: string | undefined;
-      let selectedProvider: 'anthropic' | 'openrouter' | undefined;
+      let selectedProvider: 'anthropic' | 'openrouter' | 'claude-code' | undefined;
 
-      // Use model router if OpenRouter is available (for cost savings)
-      if (config.OPENROUTER_API_KEY) {
+      // Provider mode drives provider selection
+      const { resolved: resolvedMode } = this.ai.getProviderMode();
+      const claudeCodeActive = this.ai.getAvailableProviders().includes('claude-code');
+      const needsTools = toolDefs.length > 0;
+
+      if (resolvedMode === 'max' && claudeCodeActive) {
+        // MAX mode: Claude Code CLI primary (FREE)
+        if (!needsTools) {
+          selectedProvider = 'claude-code';
+          selectedModelId = undefined;
+          logger.info('Model selected', { provider: 'claude-code', mode: 'max', reason: 'FREE — no tools needed' });
+        } else {
+          // Tools required → Anthropic API (CLI doesn't support tool_use blocks)
+          selectedProvider = 'anthropic';
+          selectedModelId = config.AI_MODEL;
+          logger.info('Model selected', { provider: 'anthropic', mode: 'max', reason: 'tool_use required', tools: agentTools.length });
+        }
+      } else if (resolvedMode === 'pro') {
+        // PRO mode: Anthropic API primary
+        selectedProvider = 'anthropic';
+        selectedModelId = config.AI_MODEL;
+        logger.info('Model selected', { provider: 'anthropic', mode: 'pro', model: config.AI_MODEL });
+      } else if (resolvedMode === 'economy') {
+        // ECONOMY mode: OpenRouter free models → model router for cost optimization
         const modelOverride = config.MODEL_OVERRIDE;
         if (modelOverride) {
           selectedModelId = modelOverride;
@@ -498,7 +520,7 @@ If they want to check a running project, use "status" with projectName.`,
           const complexity = classifyComplexity({
             intent: routing.intent,
             messageLength: lastMsgStr.length,
-            hasTools: toolDefs.length > 0,
+            hasTools: needsTools,
             requiresHebrew: hasHebrew,
             requiresVision: false,
             isMultiStep: toolDefs.length > 3,
@@ -506,7 +528,7 @@ If they want to check a running project, use "status" with projectName.`,
 
           const selectedModel = selectModel({
             complexity,
-            requiresTools: toolDefs.length > 0,
+            requiresTools: needsTools,
             requiresHebrew: hasHebrew,
             requiresVision: false,
             dailyBudgetLeft: this.usageTracker?.getDailyBudgetLeft() ?? 10,
@@ -516,10 +538,20 @@ If they want to check a running project, use "status" with projectName.`,
           selectedModelId = selectedModel.id;
           selectedProvider = selectedModel.provider;
           logger.info('Model selected', {
-            complexity, model: selectedModel.name, tier: selectedModel.tier,
+            mode: 'economy', complexity, model: selectedModel.name, tier: selectedModel.tier,
             cost: `$${selectedModel.costPer1kInput}/$${selectedModel.costPer1kOutput}`,
           });
         }
+      } else {
+        // Fallback: max with CLI if available, else pro
+        if (claudeCodeActive && !needsTools) {
+          selectedProvider = 'claude-code';
+          selectedModelId = undefined;
+        } else {
+          selectedProvider = 'anthropic';
+          selectedModelId = config.AI_MODEL;
+        }
+        logger.info('Model selected', { provider: selectedProvider, mode: resolvedMode, reason: 'fallback' });
       }
 
       let response;

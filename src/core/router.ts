@@ -140,32 +140,44 @@ export class IntentRouter {
   async classify(message: string, conversationContext?: string): Promise<RoutingResult> {
     const contextNote = conversationContext ? `\n\nRecent conversation context:\n${conversationContext}` : '';
 
+    // Always try keyword fallback FIRST — it's instant and reliable for Hebrew
+    const keywordResult = this.keywordClassify(message);
+
     try {
+      // Claude Code CLI = primary for classification (FREE + reliable + great at Hebrew JSON)
+      // If CLI unavailable, fallback to OpenRouter/Anthropic
+      const hasClaudeCode = this.ai.getAvailableProviders().includes('claude-code');
+
       const response = await this.ai.chat({
         systemPrompt: ROUTING_PROMPT + contextNote,
         messages: [{ role: 'user', content: message }],
         maxTokens: 200,
         temperature: 0.1,
-        model: config.OPENROUTER_API_KEY
-          ? config.OPENROUTER_ECONOMY_MODEL
-          : 'claude-haiku-4-5-20251001',
-        provider: config.OPENROUTER_API_KEY ? 'openrouter' : 'anthropic',
+        // When Claude Code CLI is active, don't specify model/provider → fallback chain uses CLI first
+        ...(!hasClaudeCode ? {
+          model: config.OPENROUTER_API_KEY
+            ? 'meta-llama/llama-3.3-70b-instruct:free'
+            : 'claude-haiku-4-5-20251001',
+          provider: (config.OPENROUTER_API_KEY ? 'openrouter' : 'anthropic') as 'openrouter' | 'anthropic',
+        } : {}),
       });
 
       const parsed = extractJSON(response.content);
-      return {
-        intent: parsed.intent as Intent,
-        confidence: parsed.confidence,
-        agentId: parsed.agent,
-        extractedParams: parsed.params ?? {},
-      };
+      if (parsed && parsed.intent) {
+        return {
+          intent: parsed.intent as Intent,
+          confidence: parsed.confidence,
+          agentId: parsed.agent,
+          extractedParams: parsed.params ?? {},
+        };
+      }
+      // AI returned something but no valid intent — use keyword result
+      throw new Error('No valid intent in AI response');
     } catch (error: any) {
       logger.warn('AI classification failed, trying keyword fallback', { error: error?.message ?? String(error) });
-      // Keyword-based fallback — catches common patterns when AI router fails
-      const fallback = this.keywordClassify(message);
-      if (fallback) {
-        logger.info('Keyword fallback matched', { intent: fallback.intent, agent: fallback.agentId });
-        return fallback;
+      if (keywordResult) {
+        logger.info('Keyword fallback matched', { intent: keywordResult.intent, agent: keywordResult.agentId });
+        return keywordResult;
       }
       return { intent: Intent.GENERAL_CHAT, confidence: 0.5, agentId: 'general', extractedParams: {} };
     }
@@ -179,13 +191,18 @@ export class IntentRouter {
     const m = message.toLowerCase();
 
     // Content creation (images, videos, music)
-    if (/תיצור|צור.*תמונ|תעשה.*תמונ|generate.*image|create.*image|make.*image|תיצור.*וידאו|צור.*וידאו|generate.*video|create.*video|make.*video|תעשה.*וידאו|צור.*שיר|generate.*music|AI art/i.test(message)) {
+    if (/תיצור|צור.*תמונ|תעשה.*תמונ|generate.*image|create.*image|make.*image|תיצור.*וידאו|צור.*וידאו|generate.*video|create.*video|make.*video|תעשה.*וידאו|צור.*שיר|generate.*music|AI art|UGC|וידאו|סרטון|תמונה|שיר|מוזיקה/i.test(message)) {
       return { intent: Intent.CONTENT_CREATE, confidence: 0.85, agentId: 'content-creator', extractedParams: {} };
     }
 
-    // Social media publish
-    if (/תפרסם|פרסם|publish|post.*to|share.*to|cross.?post|תזמן.*פוסט|schedule.*post/i.test(message)) {
+    // Social media publish — catch any mention of platforms, publishing, blotato, social
+    if (/תפרסם|פרסם|פרסום|publish|post.*to|share.*to|cross.?post|תזמן.*פוסט|schedule.*post|blotato|בלוטאטו|רשתות.*חברת|social.*media|instagram|tiktok|facebook|youtube|טיק.?טוק|אינסטגרם|פייסבוק|יוטיוב|reels|רילס|רשתות/i.test(message)) {
       return { intent: Intent.SOCIAL_PUBLISH, confidence: 0.85, agentId: 'content-creator', extractedParams: {} };
+    }
+
+    // Workflow / automation
+    if (/אוטומציה|automation|workflow|תהליך|כל.*יום|every.*day|cron|קרון|תזמן|schedule|פעם.*ביום|once.*day/i.test(message)) {
+      return { intent: Intent.WORKFLOW, confidence: 0.8, agentId: 'content-creator', extractedParams: {} };
     }
 
     // Server management

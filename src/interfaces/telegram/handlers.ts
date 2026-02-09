@@ -25,14 +25,14 @@ export function setupHandlers(bot: Bot, engine: Engine) {
     const name = ctx.from?.first_name ?? 'there';
     await ctx.reply(
       `👋 Hey ${name}! I'm **ClawdAgent** — your AI assistant.\n\n` +
-      `🖥️ /servers — Manage servers\n💻 /code — Write & fix code\n🔍 /search — Web search\n📋 /tasks — Task manager\n⚙️ /settings — Settings\n❓ /help — Full command list\n\nOr just send me a message! 🚀`,
+      `🖥️ /servers — Manage servers\n💻 /code — Write & fix code\n🔍 /search — Web search\n📋 /tasks — Task manager\n🔌 /provider — AI provider mode\n⚙️ /settings — Settings\n❓ /help — Full command list\n\nOr just send me a message! 🚀`,
       { parse_mode: 'Markdown' }
     );
   });
 
   bot.command('help', async (ctx) => {
     await ctx.reply(
-      `📚 **ClawdAgent Commands**\n\n**General**: /start, /help, /status\n**Servers**: /servers, /deploy, /logs\n**Code**: /code, /pr, /review\n**Search**: /search, /ask\n**Tasks**: /tasks, /todo, /remind\n**Settings**: /settings\n\n💡 Just type naturally!`,
+      `📚 **ClawdAgent Commands**\n\n**General**: /start, /help, /status\n**Servers**: /servers, /deploy, /logs\n**Code**: /code, /pr, /review\n**Search**: /search, /ask\n**Tasks**: /tasks, /todo, /remind\n**Settings**: /settings, /provider\n\n🔌 /provider — View/switch AI provider mode\n\n💡 Just type naturally!`,
       { parse_mode: 'Markdown' }
     );
   });
@@ -40,10 +40,52 @@ export function setupHandlers(bot: Bot, engine: Engine) {
   bot.command('status', async (ctx) => {
     const uptime = process.uptime();
     const h = Math.floor(uptime / 3600), m = Math.floor((uptime % 3600) / 60);
+    const modeInfo = engine.getAIClient().getProviderMode();
     await ctx.reply(
-      `📊 **ClawdAgent Status**\n✅ Bot: Online\n⏱️ Uptime: ${h}h ${m}m\n💾 Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
+      `📊 **ClawdAgent Status**\n✅ Bot: Online\n⏱️ Uptime: ${h}h ${m}m\n💾 Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB\n🔌 Provider: ${modeInfo.resolved} (${modeInfo.mode})`,
       { parse_mode: 'Markdown' }
     );
+  });
+
+  bot.command('provider', async (ctx) => {
+    const ai = engine.getAIClient();
+    const arg = ctx.match?.trim().toLowerCase();
+
+    if (arg && ['auto', 'economy', 'pro', 'max'].includes(arg)) {
+      ai.setProviderMode(arg as 'auto' | 'economy' | 'pro' | 'max');
+      const info = ai.getProviderMode();
+      await ctx.reply(
+        `✅ Provider mode changed to **${arg}**${arg === 'auto' ? ` (resolved: ${info.resolved})` : ''}\n\nFallback chain: ${info.fallbackOrder.join(' → ')}`,
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+
+    const info = ai.getProviderMode();
+    const providers = ai.getAvailableProviders();
+    const savings = ai.getClaudeCodeAdapter()?.getSavings() ?? 0;
+
+    const modeDescriptions: Record<string, string> = {
+      economy: '💰 Economy — OpenRouter free models (cheapest)',
+      pro: '⚡ Pro — Anthropic API (best quality/cost)',
+      max: '🚀 Max — Claude Code CLI (FREE via Max sub)',
+      auto: '🔄 Auto — detect best available',
+    };
+
+    const lines = [
+      `🔌 **Provider Mode: ${info.mode}**${info.mode === 'auto' ? ` → ${info.resolved}` : ''}`,
+      '',
+      `**Fallback chain:** ${info.fallbackOrder.join(' → ')}`,
+      `**Available:** ${providers.join(', ')}`,
+      savings > 0 ? `**CLI savings:** $${savings.toFixed(4)}` : '',
+      '',
+      '**Available modes:**',
+      ...Object.values(modeDescriptions),
+      '',
+      '**Switch:** `/provider economy` / `/provider pro` / `/provider max` / `/provider auto`',
+    ].filter(Boolean);
+
+    await ctx.reply(lines.join('\n'), { parse_mode: 'Markdown' });
   });
 
   bot.on('message:text', async (ctx) => {

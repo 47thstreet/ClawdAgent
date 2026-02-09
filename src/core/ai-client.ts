@@ -315,10 +315,30 @@ class ClaudeCodeProviderAdapter implements ProviderClient {
   markUnavailable(): void { this.available = false; }
 }
 
+// ── Provider Mode Fallback Chains ────────────────────────────────────
+const PROVIDER_FALLBACK_CHAINS: Record<string, string[]> = {
+  max:     ['claude-code', 'anthropic', 'openrouter', 'openai', 'ollama'],
+  pro:     ['anthropic', 'openrouter', 'openai', 'ollama'],
+  economy: ['openrouter', 'anthropic', 'openai', 'ollama'],
+  auto:    ['claude-code', 'anthropic', 'openrouter', 'openai', 'ollama'], // resolved at init
+};
+
+/**
+ * Resolve "auto" mode to the best available mode:
+ *   CLI available? → max | API key? → pro | else → economy
+ */
+function resolveAutoMode(providers: Map<string, ProviderClient>): string {
+  if (providers.has('claude-code')) return 'max';
+  if (providers.has('anthropic')) return 'pro';
+  return 'economy';
+}
+
 // ── Unified AI Client ───────────────────────────────────────────────
 export class AIClient {
   private providers: Map<string, ProviderClient> = new Map();
   private fallbackOrder: string[];
+  private providerMode: string;
+  private resolvedMode: string;
   private totalTokensUsed = { input: 0, output: 0 };
   private claudeCodeAdapter?: ClaudeCodeProviderAdapter;
 
@@ -337,11 +357,16 @@ export class AIClient {
     if (openai.available) this.providers.set('openai', openai);
     if (ollama.available) this.providers.set('ollama', ollama);
 
-    // Fallback order: claude-code (free) → anthropic → openrouter → openai → ollama
-    this.fallbackOrder = ['claude-code', 'anthropic', 'openrouter', 'openai', 'ollama'];
+    // Provider mode from config
+    this.providerMode = config.PROVIDER_MODE ?? 'auto';
+    this.resolvedMode = this.providerMode === 'auto' ? resolveAutoMode(this.providers) : this.providerMode;
+    this.fallbackOrder = PROVIDER_FALLBACK_CHAINS[this.resolvedMode] ?? PROVIDER_FALLBACK_CHAINS.auto;
 
     logger.info('AI Client initialized', {
       providers: Array.from(this.providers.keys()),
+      providerMode: this.providerMode,
+      resolvedMode: this.resolvedMode,
+      fallbackOrder: this.fallbackOrder.filter(p => this.providers.has(p)),
       primary: this.fallbackOrder.find(p => this.providers.has(p)) ?? 'none',
     });
   }
@@ -355,11 +380,42 @@ export class AIClient {
       } else {
         this.providers.delete('claude-code');
       }
+      // Re-resolve auto mode now that we know CLI status
+      if (this.providerMode === 'auto') {
+        this.resolvedMode = resolveAutoMode(this.providers);
+        this.fallbackOrder = PROVIDER_FALLBACK_CHAINS[this.resolvedMode] ?? PROVIDER_FALLBACK_CHAINS.auto;
+        logger.info('Provider mode resolved after CLI check', {
+          providerMode: this.providerMode,
+          resolvedMode: this.resolvedMode,
+          fallbackOrder: this.fallbackOrder.filter(p => this.providers.has(p)),
+        });
+      }
     }
   }
 
   /** Get the Claude Code provider adapter (for status/savings) */
   getClaudeCodeAdapter(): ClaudeCodeProviderAdapter | undefined { return this.claudeCodeAdapter; }
+
+  /** Get current provider mode info */
+  getProviderMode(): { mode: string; resolved: string; fallbackOrder: string[] } {
+    return {
+      mode: this.providerMode,
+      resolved: this.resolvedMode,
+      fallbackOrder: this.fallbackOrder.filter(p => this.providers.has(p)),
+    };
+  }
+
+  /** Set provider mode at runtime (e.g. from /provider command) */
+  setProviderMode(mode: 'auto' | 'economy' | 'pro' | 'max'): void {
+    this.providerMode = mode;
+    this.resolvedMode = mode === 'auto' ? resolveAutoMode(this.providers) : mode;
+    this.fallbackOrder = PROVIDER_FALLBACK_CHAINS[this.resolvedMode] ?? PROVIDER_FALLBACK_CHAINS.auto;
+    logger.info('Provider mode changed', {
+      mode: this.providerMode,
+      resolved: this.resolvedMode,
+      fallbackOrder: this.fallbackOrder.filter(p => this.providers.has(p)),
+    });
+  }
 
   async chat(request: AIRequest): Promise<AIResponse> {
     // Sanitize all text to strip lone surrogates (Hebrew + emoji from Telegram)

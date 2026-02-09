@@ -78,6 +78,8 @@ const configSchema = z.object({
   BLOTATO_ACCOUNT_BLUESKY: z.string().optional(),
   BLOTATO_ACCOUNT_PINTEREST: z.string().optional(),
   BLOTATO_FACEBOOK_PAGE_ID: z.string().optional(),
+  // Provider mode: auto | economy | pro | max
+  PROVIDER_MODE: z.enum(['auto', 'economy', 'pro', 'max']).default('auto'),
   // Claude Code CLI (FREE via Max subscription — $200/month flat)
   CLAUDE_CODE_ENABLED: z.string().default('true').transform(v => v === 'true'),
   CLAUDE_CODE_PATH: z.string().default('claude'),
