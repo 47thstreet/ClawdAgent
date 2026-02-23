@@ -1,0 +1,16 @@
+{
+  "id": "seo-analyzer",
+  "name": "SEO Analyzer",
+  "description": "Analyze website SEO and give recommendations.",
+  "trigger": "(SEO|seo|אסאיאו|analyze seo|בדוק SEO|תנתח SEO)",
+  "prompt": "Analyze website SEO and give recommendations.",
+  "examples": [
+    "SEO analysis",
+    "בדוק SEO",
+    "Analyze SEO"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "content-pipeline",
+  "name": "Content Pipeline",
+  "description": "End-to-end content creation to publish workflow.",
+  "trigger": "(content pipeline|צור ופרסם|create and publish|pipeline|תוכן מלא)",
+  "prompt": "End-to-end content creation to publish workflow.",
+  "examples": [
+    "Create content pipeline",
+    "צור ופרסם תוכן",
+    "Content to publish flow"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

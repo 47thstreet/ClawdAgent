@@ -15,8 +15,9 @@ web/dist/
 logs/
 *.log
 
-# Data
-data/
+# Data (runtime — ignore contents, not the directory itself)
+data/*
+!data/skills/
 *.sqlite
 
 # OS
@@ -59,10 +60,9 @@ credentials.json
 # SSH keys
 .ssh/
 
-# Conversation history & user data
+# Conversation history & user data (NOT skills — those ship with the repo)
 data/conversations/
 data/whatsapp-session/
-data/skills/
 data/memory/
 
 # Claude Code local settings

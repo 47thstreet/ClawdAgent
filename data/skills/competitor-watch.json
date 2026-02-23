@@ -1,0 +1,16 @@
+{
+  "id": "competitor-watch",
+  "name": "Competitor Watch",
+  "description": "Monitor competitor websites and report changes.",
+  "trigger": "(competitor|מתחרים|תנטר מתחרים|watch competitor|monitor competitor)",
+  "prompt": "Monitor competitor websites and report changes.",
+  "examples": [
+    "Monitor competitors",
+    "תנטר מתחרים",
+    "Watch competitor changes"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "report-generator",
+  "name": "Report Generator",
+  "description": "Generate formatted business reports.",
+  "trigger": "(report|דוח|generate report|צור דוח|תכין דוח|סיכום מפורט)",
+  "prompt": "Generate formatted business reports.",
+  "examples": [
+    "Generate report",
+    "צור דוח",
+    "Business report"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

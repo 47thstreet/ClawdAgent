@@ -1,0 +1,16 @@
+{
+  "id": "server-security-audit",
+  "name": "Server Security Audit",
+  "description": "Full security audit of connected servers.",
+  "trigger": "(security audit|אודיט אבטחה|תבדוק אבטחה|server audit|סריקת אבטחה)",
+  "prompt": "Full security audit of connected servers.",
+  "examples": [
+    "Server security audit",
+    "אודיט אבטחה",
+    "סריקת אבטחה"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

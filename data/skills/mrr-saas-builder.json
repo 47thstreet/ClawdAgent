@@ -1,0 +1,16 @@
+{
+  "id": "mrr-saas-builder",
+  "name": "MRR SaaS Builder",
+  "description": "End-to-end autonomous SaaS application builder focused on MRR. Researches markets, designs architecture, builds MVP, sets up payments, deploys, and automates growth.",
+  "trigger": "(saas|SaaS|mrr|MRR|build app|בנה אפליקציה|בנה סאאס|monthly recurring|recurring revenue|הכנסה חודשית|build product|בנה מוצר|micro saas|מיקרו סאאס|build startup|startup builder|pieter levels|indie hacker|אינדי האקר|passive income|הכנסה פסיבית|build business|בנה עסק)",
+  "prompt": "End-to-end autonomous SaaS application builder focused on MRR (Monthly Recurring Revenue). Researches markets, designs architecture, builds MVP, sets up payments, deploys, and automates growth — inspired by Pieter Levels.",
+  "examples": [
+    "Build a SaaS",
+    "בנה אפליקציה SaaS",
+    "MRR product"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

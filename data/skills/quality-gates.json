@@ -1,0 +1,16 @@
+{
+  "id": "quality-gates",
+  "name": "Quality Gates",
+  "description": "Pre-deploy quality checks — tests, types, lint, security.",
+  "trigger": "(quality gate|ship|deploy check|בדיקת איכות|לפני deploy|ready to ship)",
+  "prompt": "Pre-deploy quality checks — tests, types, lint, security.",
+  "examples": [
+    "Quality check",
+    "Ready to ship",
+    "בדיקת איכות"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

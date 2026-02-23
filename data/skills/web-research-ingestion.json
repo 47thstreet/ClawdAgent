@@ -1,0 +1,16 @@
+{
+  "id": "web-research-ingestion",
+  "name": "Web Research & Ingestion",
+  "description": "Research topics on the web and ingest findings into the knowledge base.",
+  "trigger": "(research|investigate|find.*out.*about|learn.*about|חקור|מצא.*מידע|למד.*על|תחקור|web.*research|search.*for|חיפוש.*מידע)",
+  "prompt": "Research topics on the web and ingest findings into the knowledge base.",
+  "examples": [
+    "Research this topic",
+    "חקור את הנושא",
+    "Web research"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

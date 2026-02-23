@@ -1,0 +1,16 @@
+{
+  "id": "knowledge-base-management",
+  "name": "Knowledge Base Management",
+  "description": "Upload documents, ingest URLs, query and manage the RAG knowledge base.",
+  "trigger": "(knowledge.*base|upload.*document|ingest.*url|\\brag\\b|בסיס.*ידע|העלה.*מסמך|מאגר.*מידע|query.*knowledge|search.*docs|חפש.*במאגר)",
+  "prompt": "Upload documents, ingest URLs, query and manage the RAG knowledge base.",
+  "examples": [
+    "Upload to knowledge base",
+    "בסיס ידע",
+    "Query documents"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}
