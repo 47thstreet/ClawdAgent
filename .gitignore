@@ -48,10 +48,22 @@ tmp/
 *.bak
 nul
 
-# Secrets
+# Secrets & credentials
 *.pem
 *.key
 credentials.json
+*.p12
+*.pfx
+*.jks
+
+# SSH keys
+.ssh/
+
+# Conversation history & user data
+data/conversations/
+data/whatsapp-session/
+data/skills/
+data/memory/
 
 # Claude Code local settings
 .claude/settings.local.json

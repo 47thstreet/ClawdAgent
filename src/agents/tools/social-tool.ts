@@ -50,21 +50,42 @@ export class SocialTool extends BaseTool {
 
         case 'publish_all': {
           if (!text) return { success: false, output: '', error: 'text required' };
+          const includeSecondary = input.includeSecondary !== false; // default true
           const targetPlatforms = platforms || ['twitter', 'instagram', 'facebook', 'linkedin', 'tiktok', 'threads', 'youtube'];
           const results: string[] = [];
 
           for (const p of targetPlatforms) {
             const limit = CHAR_LIMITS[p] || 5000;
             const trimmedText = text.slice(0, limit);
-            try {
-              const result = await this.publishToOne(p, trimmedText, mediaUrls, options);
-              results.push(result);
-              await new Promise(r => setTimeout(r, 2000));
-            } catch (err: any) {
-              results.push(`${p}: FAILED — ${err.message}`);
+            const accountIds = includeSecondary ? this.getAccountIds(p) : [this.getAccountId(p)];
+            for (const accId of accountIds) {
+              try {
+                const result = await this.publishToOneWithAccount(p, accId, trimmedText, mediaUrls, options);
+                results.push(result);
+                await new Promise(r => setTimeout(r, 2000));
+              } catch (err: any) {
+                results.push(`${p} (${accId}): FAILED — ${err.message}`);
+              }
             }
           }
 
+          return { success: true, output: results.join('\n') };
+        }
+
+        case 'publish_multi_account': {
+          if (!platform || !text) return { success: false, output: '', error: 'platform and text required' };
+          const accountIds = this.getAccountIds(platform);
+          if (accountIds.length === 0) return { success: false, output: '', error: `No accounts configured for ${platform}` };
+          const results: string[] = [];
+          for (const accId of accountIds) {
+            try {
+              const result = await this.publishToOneWithAccount(platform, accId, text, mediaUrls, options);
+              results.push(result);
+              await new Promise(r => setTimeout(r, 2000));
+            } catch (err: any) {
+              results.push(`${platform} (${accId}): FAILED — ${err.message}`);
+            }
+          }
           return { success: true, output: results.join('\n') };
         }
 
@@ -128,7 +149,7 @@ export class SocialTool extends BaseTool {
         }
 
         default:
-          return { success: false, output: '', error: `Unknown action: ${action}. Available: publish, publish_all, publish_thread, upload_media, check_post, schedule` };
+          return { success: false, output: '', error: `Unknown action: ${action}. Available: publish, publish_all, publish_multi_account, publish_thread, upload_media, check_post, schedule` };
       }
     } catch (err: any) {
       this.error('Social tool error', { action, error: err.message });
@@ -137,12 +158,16 @@ export class SocialTool extends BaseTool {
   }
 
   private async publishToOne(platform: string, text: string, mediaUrls?: string[], options?: Record<string, unknown>): Promise<string> {
+    return this.publishToOneWithAccount(platform, this.getAccountId(platform), text, mediaUrls, options);
+  }
+
+  private async publishToOneWithAccount(platform: string, accountId: string, text: string, mediaUrls?: string[], options?: Record<string, unknown>): Promise<string> {
     const urls = mediaUrls || [];
     const hasVideo = urls.some(u => /\.(mp4|mov|avi|webm|mkv)(\?|$)/i.test(u));
     const mediaType = hasVideo ? (platform === 'instagram' ? 'REELS' : platform === 'facebook' ? 'reel' : undefined) : undefined;
     const body = {
       post: {
-        accountId: this.getAccountId(platform),
+        accountId,
         content: {
           text,
           mediaUrls: urls,
@@ -152,8 +177,9 @@ export class SocialTool extends BaseTool {
       },
     };
     const typeLabel = mediaType ? ` (${mediaType})` : '';
+    const accountLabel = this.getAccountIds(platform).length > 1 ? ` [${accountId}]` : '';
     const res = await this.post('/posts', body);
-    return `${platform}${typeLabel}: Published! Post ID: ${res.postSubmissionId}`;
+    return `${platform}${accountLabel}${typeLabel}: Published! Post ID: ${res.postSubmissionId}`;
   }
 
   private buildTarget(platform: string, options?: Record<string, unknown>, mediaUrls?: string[]): Record<string, unknown> {
@@ -210,6 +236,16 @@ export class SocialTool extends BaseTool {
   private getAccountId(platform: string): string {
     const envKey = `BLOTATO_ACCOUNT_${platform.toUpperCase()}`;
     return (config as any)[envKey] || `acc_${platform}`;
+  }
+
+  /** Get all account IDs for a platform (primary + secondary if _2 exists) */
+  private getAccountIds(platform: string): string[] {
+    const ids: string[] = [];
+    const primary = (config as any)[`BLOTATO_ACCOUNT_${platform.toUpperCase()}`];
+    if (primary) ids.push(primary);
+    const secondary = (config as any)[`BLOTATO_ACCOUNT_${platform.toUpperCase()}_2`];
+    if (secondary) ids.push(secondary);
+    return ids.length > 0 ? ids : [`acc_${platform}`];
   }
 
   private async post(endpoint: string, body: Record<string, unknown>): Promise<any> {

@@ -1,6 +1,6 @@
 {
   "name": "clawdagent",
-  "version": "6.0.0",
+  "version": "6.1.0",
   "description": "Autonomous AI agent system — 18 agents, 29 tools, 74 skills. Self-evolving, multi-platform, multi-model.",
   "type": "module",
   "license": "Apache-2.0",

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { timingSafeEqual } from 'crypto';
 import logger from '../../../utils/logger.js';
 import config from '../../../config.js';
+import { sanitizeInput, containsSuspiciousPatterns } from '../../../security/input-sanitizer.js';
 
 // ─── OpenClaw Webhook Event Types ────────────────────────────────────────────
 
@@ -180,6 +181,15 @@ export function setupWebhookRoutes(): Router {
         source: event.source,
         severity: event.severity,
       });
+
+      // Sanitize event content before forwarding (prevent injection via webhook payload)
+      if (event.summary) event.summary = sanitizeInput(event.summary);
+      if (event.message) event.message = sanitizeInput(event.message);
+      if (event.jobName) event.jobName = sanitizeInput(event.jobName);
+      if (containsSuspiciousPatterns(JSON.stringify(event.data ?? {}))) {
+        logger.warn('Suspicious patterns in webhook event data', { type: event.type });
+        event.data = { warning: 'Content sanitized — suspicious patterns detected' };
+      }
 
       // Format and send to Telegram
       if (telegramSender && config.TELEGRAM_ADMIN_IDS.length > 0) {

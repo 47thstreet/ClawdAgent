@@ -5,24 +5,38 @@ import config from '../../config.js';
 
 const execAsync = promisify(exec);
 
-const BRIDGE_PATH = '/home/openclaw/clawdagent-bridge.js';
-const BRIDGE_VER = '4';
+const BRIDGE_PATH = '/home/openclaw/clawdagent-bridge-v7.js';
+const BRIDGE_VER = '7';
+
+// ClawdAgent device credentials (Ed25519, paired with OpenClaw gateway)
+// Set these in .env: OPENCLAW_DEVICE_ID, OPENCLAW_DEVICE_PUBLIC_KEY, OPENCLAW_DEVICE_PRIVATE_KEY, OPENCLAW_DEVICE_TOKEN
+const DEVICE_ID = process.env.OPENCLAW_DEVICE_ID || '';
+const DEVICE_PUBLIC_KEY = process.env.OPENCLAW_DEVICE_PUBLIC_KEY || '';
+const DEVICE_PRIVATE_KEY_DER = process.env.OPENCLAW_DEVICE_PRIVATE_KEY || '';
+const DEVICE_TOKEN = process.env.OPENCLAW_DEVICE_TOKEN || '';
 
 // ─── Embedded bridge script (deployed to server on first use) ────────────────
 const BRIDGE_SCRIPT = `#!/usr/bin/env node
 'use strict';
-const { randomUUID } = require('crypto');
+const crypto = require('crypto');
+const { randomUUID } = crypto;
 
 const PORT = process.env.OPENCLAW_GATEWAY_PORT || 18789;
-const TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || '';
 const TIMEOUT = parseInt(process.env.BRIDGE_TIMEOUT || '30000', 10);
 const AGENT_TIMEOUT = parseInt(process.env.BRIDGE_AGENT_TIMEOUT || '120000', 10);
+
+// Device auth credentials (Ed25519)
+const DEV_ID = process.env.OPENCLAW_DEVICE_ID || '';
+const DEV_PUB = process.env.OPENCLAW_DEVICE_PUBLIC_KEY || '';
+const DEV_PRIV = process.env.OPENCLAW_DEVICE_PRIVATE_KEY || '';
+const DEV_TOKEN = process.env.OPENCLAW_DEVICE_TOKEN || '';
+const FALLBACK_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || '';
 
 const method = process.argv[2];
 const paramsB64 = process.argv[3] || '';
 
 if (!method) {
-  out({ ok: false, error: 'Usage: node clawdagent-bridge.js <method> [base64-params]' });
+  out({ ok: false, error: 'Usage: node bridge.js <method> [base64-params]' });
   process.exit(1);
 }
 
@@ -33,6 +47,18 @@ if (paramsB64) {
 }
 
 function out(obj) { console.log(JSON.stringify(obj)); }
+
+function signDevice() {
+  if (!DEV_ID || !DEV_PUB || !DEV_PRIV || !DEV_TOKEN) return null;
+  try {
+    const signedAt = Date.now();
+    const scopes = 'operator.admin,operator.write,operator.read,operator.approvals';
+    const payload = ['v1', DEV_ID, 'gateway-client', 'backend', 'operator', scopes, String(signedAt), DEV_TOKEN].join('|');
+    const privKey = crypto.createPrivateKey({ key: Buffer.from(DEV_PRIV, 'base64'), type: 'pkcs8', format: 'der' });
+    const sig = crypto.sign(null, Buffer.from(payload, 'utf8'), privKey);
+    return { id: DEV_ID, publicKey: DEV_PUB, signature: sig.toString('base64url'), signedAt };
+  } catch (e) { return null; }
+}
 
 // Find ws module
 let WS;
@@ -71,15 +97,16 @@ ws.on('message', (raw) => {
 
   if (msg.type === 'event' && msg.event === 'connect.challenge') {
     phase = 'auth';
-    ws.send(JSON.stringify({
-      type: 'req', id: cid, method: 'connect',
-      params: {
-        minProtocol: 3, maxProtocol: 3,
-        client: { id: 'cli', displayName: 'ClawdAgent', version: '1.0.0', platform: 'linux', mode: 'backend', instanceId: randomUUID() },
-        caps: [], role: 'operator', scopes: ['operator.admin'],
-        auth: { token: TOKEN }
-      }
-    }));
+    const device = signDevice();
+    const token = device ? DEV_TOKEN : FALLBACK_TOKEN;
+    const connectParams = {
+      minProtocol: 3, maxProtocol: 3,
+      client: { id: 'gateway-client', displayName: 'ClawdAgent', version: '2.0.0', platform: 'linux', mode: 'backend', instanceId: randomUUID() },
+      caps: [], role: 'operator', scopes: ['operator.admin', 'operator.write', 'operator.read', 'operator.approvals'],
+      auth: { token }
+    };
+    if (device) connectParams.device = device;
+    ws.send(JSON.stringify({ type: 'req', id: cid, method: 'connect', params: connectParams }));
     return;
   }
 
@@ -136,8 +163,6 @@ export class OpenClawTool extends BaseTool {
       const { stdout } = await execAsync(sshCmd, { timeout: timeoutMs, maxBuffer: 2 * 1024 * 1024 });
       return stdout.trim();
     } catch (err: any) {
-      // Bridge returns exit code 1 for gateway errors but still outputs valid JSON on stdout.
-      // Extract stdout from the exec error so callGateway can parse the error response.
       if (err.stdout && err.stdout.trim()) {
         return err.stdout.trim();
       }
@@ -164,11 +189,16 @@ export class OpenClawTool extends BaseTool {
     await this.ensureDeployed();
 
     const paramsB64 = Buffer.from(JSON.stringify(params)).toString('base64');
-    const envToken = `OPENCLAW_GATEWAY_TOKEN=${this.gatewayToken}`;
-    const cmd = `${envToken} node ${BRIDGE_PATH} ${method} ${paramsB64}`;
+    const envVars = [
+      `OPENCLAW_DEVICE_ID=${DEVICE_ID}`,
+      `OPENCLAW_DEVICE_PUBLIC_KEY=${DEVICE_PUBLIC_KEY}`,
+      `OPENCLAW_DEVICE_PRIVATE_KEY=${DEVICE_PRIVATE_KEY_DER}`,
+      `OPENCLAW_DEVICE_TOKEN=${DEVICE_TOKEN}`,
+      `OPENCLAW_GATEWAY_TOKEN=${this.gatewayToken}`,
+    ].join(' ');
+    const cmd = `${envVars} node ${BRIDGE_PATH} ${method} ${paramsB64}`;
 
     const raw = await this.ssh(cmd, timeoutMs);
-    // Bridge outputs exactly one JSON line — extract it even if SSH adds extra output
     const lines = raw.split('\n');
     for (const line of lines) {
       const trimmed = line.trim();
@@ -176,7 +206,6 @@ export class OpenClawTool extends BaseTool {
         return JSON.parse(trimmed);
       }
     }
-    // Fallback: try to find JSON anywhere in output
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (jsonMatch) return JSON.parse(jsonMatch[0]);
     throw new Error('No valid JSON in bridge output: ' + raw.slice(0, 300));
@@ -194,7 +223,6 @@ export class OpenClawTool extends BaseTool {
     }
 
     try {
-      // Map action → gateway method + params
       const { method, params, timeout } = this.resolveAction(action, input);
 
       this.log('Calling OpenClaw', { method, params: JSON.stringify(params).slice(0, 200) });
@@ -220,7 +248,6 @@ export class OpenClawTool extends BaseTool {
   private resolveAction(action: string, input: Record<string, unknown>): { method: string; params: Record<string, unknown>; timeout: number } {
     const p: Record<string, unknown> = { ...(input.params as Record<string, unknown> || {}) };
 
-    // Merge convenience top-level fields
     for (const key of ['to', 'message', 'channel', 'mediaUrl', 'mediaUrls', 'sessionKey', 'runId', 'agentId', 'cronExpression', 'cronId', 'jobId', 'cronLabel', 'thinking', 'deliver', 'limit', 'offset']) {
       if (input[key] !== undefined) p[key] = input[key];
     }
@@ -251,7 +278,6 @@ export class OpenClawTool extends BaseTool {
 
     const entry = methodMap[action];
     if (!entry) {
-      // Try the action as a direct method name (e.g. "cron.list")
       return { method: action, params: p, timeout: 15000 };
     }
 

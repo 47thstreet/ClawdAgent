@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useAuthStore } from '../../stores/auth';
 import { api } from '../../api/client';
 import { LogOut, Activity, Terminal, Loader2, CheckCircle } from 'lucide-react';
+import NotificationBell from '../shared/NotificationBell';
 
 interface CLIStatus {
   available: boolean;
@@ -135,10 +136,13 @@ export default function Header() {
           </span>
         )}
       </div>
-      <button onClick={logout} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm">
-        <LogOut className="w-4 h-4" />
-        Logout
-      </button>
+      <div className="flex items-center gap-3">
+        <NotificationBell />
+        <button onClick={logout} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm">
+          <LogOut className="w-4 h-4" />
+          Logout
+        </button>
+      </div>
     </header>
   );
 }

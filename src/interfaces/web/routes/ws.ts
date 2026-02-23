@@ -25,6 +25,31 @@ export function emitProgress(userId: string, event: ProgressEvent) {
   if (listener) listener(event);
 }
 
+// ─── Global Notification Broadcast ──────────────────────────────────────────
+// All authenticated WebSocket clients receive system notifications in real-time
+const authenticatedClients = new Map<string, Set<WebSocket>>();
+
+function registerAuthenticatedClient(userId: string, ws: WebSocket) {
+  if (!authenticatedClients.has(userId)) authenticatedClients.set(userId, new Set());
+  authenticatedClients.get(userId)!.add(ws);
+  ws.on('close', () => {
+    authenticatedClients.get(userId)?.delete(ws);
+    if (authenticatedClients.get(userId)?.size === 0) authenticatedClients.delete(userId);
+  });
+}
+
+/** Broadcast a notification to all connected clients */
+export function emitNotification(notification: unknown) {
+  const msg = JSON.stringify({ type: 'notification', data: notification });
+  for (const clients of authenticatedClients.values()) {
+    for (const ws of clients) {
+      try {
+        if (ws.readyState === WebSocket.OPEN) ws.send(msg);
+      } catch { /* ignore */ }
+    }
+  }
+}
+
 // ─── Pending Response Queue ─────────────────────────────────────────────────
 // Stores responses that were computed while the client was disconnected
 interface PendingResponse {
@@ -132,6 +157,9 @@ function sendSafe(ws: WebSocket, data: unknown) {
 }
 
 function setupMessageHandler(ws: WebSocket, engine: Engine, user: { userId: string; role: string }) {
+  // Register for global notification broadcasts
+  registerAuthenticatedClient(user.userId, ws);
+
   let processing = false;
   let cancelled = false;
   let currentKeepAlive: ReturnType<typeof setInterval> | null = null;

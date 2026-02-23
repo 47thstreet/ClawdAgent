@@ -125,7 +125,7 @@ export class OpenClawSync {
     if (!this.executor) return;
 
     try {
-      const result = await this.executor('status', {});
+      const result = await this.executor('health', {});
       if (result.success) {
         // Cache OpenClaw status
         const cache = getCache();

@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   MessageSquare, ListTodo, Server, Bot, Clock, Settings,
-  LayoutDashboard, Sparkles, DollarSign, ScrollText, Timer, LineChart, Database, Brain, Network, Terminal
+  LayoutDashboard, Sparkles, DollarSign, ScrollText, Timer, LineChart, Database, Brain, Network, Terminal, Zap
 } from 'lucide-react';
 
 const links = [
@@ -16,6 +16,7 @@ const links = [
   { to: '/trading', icon: LineChart, label: 'Trading' },
   { to: '/knowledge', icon: Database, label: 'Knowledge' },
   { to: '/intelligence', icon: Brain, label: 'Intelligence' },
+  { to: '/evolution', icon: Zap, label: 'Evolution' },
   { to: '/graph', icon: Network, label: 'System Graph' },
   { to: '/costs', icon: DollarSign, label: 'Costs' },
   { to: '/logs', icon: ScrollText, label: 'Logs' },

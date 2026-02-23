@@ -131,9 +131,11 @@
       "Grep",
       "Grep(*)",
       "mcp__brave-search__brave_web_search",
-      "mcp__brave-search__brave_web_search(*)",
       "mcp__brave-search__brave_local_search",
-      "mcp__brave-search__brave_local_search(*)"
+      "Bash(node:*)",
+      "Bash(pm2 describe:*)",
+      "Bash(git status:*)",
+      "Bash(git check-ignore:*)"
     ],
     "deny": [
       "Bash(rm -rf /)",
@@ -141,6 +143,9 @@
       "Bash(chmod 777 *)",
       "Bash(git push --force *)",
       "Bash(git reset --hard *)"
+    ],
+    "additionalDirectories": [
+      "/home/clickdrop-clawdagent/htdocs/clawdagent.clickdrop.online/data/skills"
     ]
   },
   "enabledPlugins": [],

@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import logger from '../utils/logger.js';
 import type { BaseTool } from '../agents/tools/base-tool.js';
 
@@ -44,11 +45,13 @@ const TOOL_MANIFEST: ToolRegistration[] = [
   { name: 'rag', modulePath: '../agents/tools/rag-tool.js', className: 'RAGTool', enabled: true },
   { name: 'whatsapp', modulePath: '../agents/tools/whatsapp-tool.js', className: 'WhatsAppTool', enabled: true },
   { name: 'tikvid', modulePath: '../agents/tools/tikvid-tool.js', className: 'TikVidTool', enabled: true },
+  { name: 'fal', modulePath: '../agents/tools/fal-tool.js', className: 'FalTool', enabled: true, requiresConfig: ['FAL_AI_API_KEY'] },
 ];
 
 class ToolRegistry {
   private manifest: ToolRegistration[] = [...TOOL_MANIFEST];
   private instances = new Map<string, BaseTool>();
+  private toolHashes = new Map<string, string>();
   private loaded = false;
 
   /** Register an additional tool (e.g., from plugin or config file) */
@@ -103,7 +106,23 @@ class ToolRegistry {
         const mod = await import(reg.modulePath);
         const ToolClass = mod[reg.className];
         if (ToolClass) {
-          this.instances.set(reg.name, new ToolClass());
+          const instance = new ToolClass();
+          this.instances.set(reg.name, instance);
+
+          // Hash-pin tool definition to detect tampering (MCP rug-pull prevention)
+          try {
+            const execSource = instance.execute?.toString() ?? '';
+            const hash = createHash('sha256').update(execSource).digest('hex').slice(0, 16);
+            const storedHash = this.toolHashes.get(reg.name);
+            if (storedHash && storedHash !== hash) {
+              logger.error('SECURITY: Tool definition changed unexpectedly!', {
+                name: reg.name, expected: storedHash, actual: hash,
+              });
+            }
+            this.toolHashes.set(reg.name, hash);
+          } catch {
+            // Hash computation non-critical
+          }
         }
       } catch (err: any) {
         logger.warn('Failed to load tool', { name: reg.name, error: err.message });

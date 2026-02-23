@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # ═══════════════════════════════════════════════════════════════════
-# ClawdAgent Installer — Production Setup Wizard v6.0
+# ClawdAgent Installer — Production Setup Wizard v6.1
+# By TestaMind — https://github.com/liortesta
 # ═══════════════════════════════════════════════════════════════════
 
 RED='\033[0;31m'
@@ -10,14 +11,35 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+BOLD='\033[1m'
 NC='\033[0m'
 
-echo -e "${CYAN}"
-echo "  ╔═══════════════════════════════════════════╗"
-echo "  ║    ClawdAgent — Setup Wizard v6.0         ║"
-echo "  ║    Autonomous AI Agent + Web Dashboard    ║"
-echo "  ╚═══════════════════════════════════════════╝"
+echo -e "${MAGENTA}${BOLD}"
+cat << 'BANNER'
+
+  ████████╗███████╗███████╗████████╗ █████╗ ███╗   ███╗██╗███╗   ██╗██████╗
+  ╚══██╔══╝██╔════╝██╔════╝╚══██╔══╝██╔══██╗████╗ ████║██║████╗  ██║██╔══██╗
+     ██║   █████╗  ███████╗   ██║   ███████║██╔████╔██║██║██╔██╗ ██║██║  ██║
+     ██║   ██╔══╝  ╚════██║   ██║   ██╔══██║██║╚██╔╝██║██║██║╚██╗██║██║  ██║
+     ██║   ███████╗███████║   ██║   ██║  ██║██║ ╚═╝ ██║██║██║ ╚████║██████╔╝
+     ╚═╝   ╚══════╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═════╝
+
+BANNER
 echo -e "${NC}"
+echo -e "${CYAN}${BOLD}"
+cat << 'BANNER2'
+       ██████╗██╗      █████╗ ██╗    ██╗██████╗  █████╗  ██████╗ ███████╗███╗   ██╗████████╗
+      ██╔════╝██║     ██╔══██╗██║    ██║██╔══██╗██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝
+      ██║     ██║     ███████║██║ █╗ ██║██║  ██║███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║
+      ██║     ██║     ██╔══██║██║███╗██║██║  ██║██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║
+      ╚██████╗███████╗██║  ██║╚███╔███╔╝██████╔╝██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║
+       ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝ ╚═════╝ ╚═╝  ╚═╝ ╚═════╝╚══════╝╚═╝  ╚═══╝   ╚═╝
+BANNER2
+echo -e "${NC}"
+echo -e "  ${GREEN}v6.1${NC} — Autonomous AI Agent | 18 Agents | 29 Tools | 74 Skills"
+echo -e "  ${YELLOW}By Lior Testa — TestaMind${NC}"
+echo ""
 
 # ── 1. Check prerequisites ──────────────────────────────────────
 echo -e "${BLUE}[1/9] Checking prerequisites...${NC}"
@@ -41,7 +63,7 @@ check_command git || MISSING=1
 if check_command claude; then
   echo -e "  ${GREEN}✔${NC} Claude Code CLI found (FREE via Max subscription)"
 else
-  echo -e "  ${YELLOW}→${NC} Claude Code CLI not found (optional — saves API costs)"
+  echo -e "  ${YELLOW}→${NC} Claude Code CLI not found (optional — FREE via Max subscription)"
   echo -e "  ${YELLOW}  Install:${NC} npm install -g @anthropic-ai/claude-code && claude login"
 fi
 
@@ -155,16 +177,24 @@ generate_key() {
   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 }
 
-# Only generate if default values
-if grep -q "change-this-to-a-real-secret" .env 2>/dev/null; then
+# Generate if empty or using default values
+JWT_CURRENT=$(grep '^JWT_SECRET=' .env 2>/dev/null | cut -d'=' -f2-)
+ENC_CURRENT=$(grep '^ENCRYPTION_KEY=' .env 2>/dev/null | cut -d'=' -f2-)
+
+if [ -z "$JWT_CURRENT" ] || echo "$JWT_CURRENT" | grep -q "change-this"; then
   JWT_KEY=$(generate_key)
-  ENC_KEY=$(generate_key)
   sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_KEY|" .env
-  sed -i "s|^ENCRYPTION_KEY=.*|ENCRYPTION_KEY=$ENC_KEY|" .env
-  echo -e "  ${GREEN}✔${NC} JWT secret generated"
-  echo -e "  ${GREEN}✔${NC} Encryption key generated"
+  echo -e "  ${GREEN}✔${NC} JWT secret generated (32-byte random)"
 else
-  echo -e "  ${YELLOW}→${NC} Security keys already set"
+  echo -e "  ${YELLOW}→${NC} JWT secret already set"
+fi
+
+if [ -z "$ENC_CURRENT" ] || echo "$ENC_CURRENT" | grep -q "change-this"; then
+  ENC_KEY=$(generate_key)
+  sed -i "s|^ENCRYPTION_KEY=.*|ENCRYPTION_KEY=$ENC_KEY|" .env
+  echo -e "  ${GREEN}✔${NC} Encryption key generated (32-byte random)"
+else
+  echo -e "  ${YELLOW}→${NC} Encryption key already set"
 fi
 
 # ── 8. Build ──────────────────────────────────────────────────────
@@ -207,23 +237,27 @@ fi
 
 # ── Done ──────────────────────────────────────────────────────────
 echo ""
-echo -e "${GREEN}═══════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}  ClawdAgent v6.0 setup complete!${NC}"
-echo -e "${GREEN}═══════════════════════════════════════════════════════${NC}"
+echo -e "${GREEN}${BOLD}═══════════════════════════════════════════════════════════${NC}"
+echo -e "${GREEN}${BOLD}  ClawdAgent v6.1 setup complete!${NC}"
+echo -e "${GREEN}${BOLD}═══════════════════════════════════════════════════════════${NC}"
 echo ""
+echo -e "  ${CYAN}Start with PM2:${NC}     pm2 start dist/index.js --name clawdagent"
 echo -e "  ${CYAN}Start development:${NC}  pnpm dev"
 echo -e "  ${CYAN}Start production:${NC}   pnpm start"
-echo -e "  ${CYAN}Web Dashboard:${NC}      http://localhost:5173"
-echo -e "  ${CYAN}API:${NC}                http://localhost:3000"
+echo -e "  ${CYAN}Web Dashboard:${NC}      http://localhost:3000"
 echo -e "  ${CYAN}Run tests:${NC}          pnpm test"
 echo -e "  ${CYAN}Build:${NC}              pnpm run build"
 echo ""
 echo -e "  ${YELLOW}Quick start with Docker:${NC}"
 echo -e "    docker compose up -d"
 echo ""
-echo -e "  ${YELLOW}Important:${NC}"
+echo -e "  ${YELLOW}Next steps:${NC}"
 echo -e "  1. Make sure PostgreSQL is running"
-echo -e "  2. Make sure Redis is running"
-echo -e "  3. Edit .env to add remaining API keys"
-echo -e "  4. Or manage keys via Dashboard → Settings"
+echo -e "  2. Make sure Redis is running (optional — queues disabled without it)"
+echo -e "  3. Edit ${CYAN}.env${NC} to add your API keys"
+echo -e "  4. Or manage keys via ${CYAN}Dashboard → Settings${NC}"
+echo -e "  5. For WhatsApp: set ${CYAN}WHATSAPP_ENABLED=true${NC} and scan QR from dashboard"
+echo -e "  6. For OpenClaw: configure ${CYAN}OPENCLAW_*${NC} vars in .env"
+echo ""
+echo -e "  ${MAGENTA}${BOLD}Powered by TestaMind${NC}"
 echo ""

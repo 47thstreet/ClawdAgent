@@ -166,6 +166,19 @@ export const api = {
   openclawChat: (text: string) => apiRequest<{ message: string; success: boolean }>('/openclaw/chat', { method: 'POST', body: JSON.stringify({ text }) }),
   openclawStatus: () => apiRequest<{ status: string; connected: boolean; data?: any }>('/openclaw/status'),
 
+  // Evolution
+  evolutionStatus: () => apiRequest<any>('/evolution/status'),
+  evolutionModels: (params?: { provider?: string; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.provider) qs.set('provider', params.provider);
+    if (params?.limit) qs.set('limit', String(params.limit));
+    return apiRequest<any>(`/evolution/models?${qs.toString()}`);
+  },
+  evolutionDiscovered: (limit?: number) => apiRequest<any>(`/evolution/discovered?limit=${limit || 50}`),
+  evolutionTrigger: (full?: boolean) => apiRequest<any>('/evolution/trigger', { method: 'POST', body: JSON.stringify({ full: !!full }) }),
+  evolutionScanModels: () => apiRequest<any>('/evolution/scan-models', { method: 'POST' }),
+  evolutionScanEcosystem: () => apiRequest<any>('/evolution/scan-ecosystem', { method: 'POST' }),
+
   // Generic GET
   get: <T = any>(path: string) => apiRequest<T>(path),
 };

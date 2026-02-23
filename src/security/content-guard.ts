@@ -14,7 +14,8 @@ import logger from '../utils/logger.js';
 
 // ── Stored Injection Sanitization ──────────────────────────────────────────
 // Patterns that should NEVER enter strategic memory from untrusted sources
-const INJECTION_PATTERNS = [
+// Exported for reuse by message-guard and skill-scanner
+export const INJECTION_PATTERNS = [
   /ignore\s+(all\s+)?previous\s+(instructions?|rules?|prompts?)/i,
   /disregard\s+(all\s+)?previous/i,
   /forget\s+(everything|all\s+rules)/i,
@@ -213,4 +214,39 @@ export function computeAuditChainHash(action: string, details: string, timestamp
  */
 export function getAuditChainHead(): string {
   return lastAuditHash;
+}
+
+// ── Injection Scanning (used by message-guard, agent-factory, skill-scanner) ──
+
+export interface InjectionScanResult {
+  detected: boolean;
+  patterns: string[];
+  score: number;
+}
+
+/**
+ * Scan text for prompt injection patterns.
+ * Returns which patterns matched and a severity score.
+ */
+export function scanForInjection(text: unknown): InjectionScanResult {
+  const str = typeof text === 'string' ? text : String(text ?? '');
+  const matched: string[] = [];
+
+  for (const pattern of INJECTION_PATTERNS) {
+    if (pattern.test(str)) {
+      matched.push(pattern.source.slice(0, 60));
+    }
+  }
+
+  // Also check dangerous tags
+  const tagMatches = str.match(DANGEROUS_TAGS);
+  if (tagMatches) {
+    matched.push(`dangerous_tags:${tagMatches.length}`);
+  }
+
+  return {
+    detected: matched.length > 0,
+    patterns: matched,
+    score: matched.length * 5, // 5 points per injection pattern
+  };
 }

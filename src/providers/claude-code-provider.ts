@@ -240,10 +240,15 @@ EXAMPLES of what to do:
     const STDIN_THRESHOLD = 8000;
     const usePipe = userPrompt.length > STDIN_THRESHOLD;
 
+    const isRoot = process.getuid?.() === 0;
     const args: string[] = [
       '--output-format', 'json',
+      ...(isRoot ? [] : ['--dangerously-skip-permissions']),
       '--append-system-prompt-file', systemFile,
     ];
+    if (isRoot) {
+      args.push('--allowedTools', 'Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch,TodoWrite');
+    }
     if (usePipe) {
       args.push('-p');
     } else {
@@ -326,14 +331,18 @@ NEVER suggest shell commands — call tools directly. If a tool fails, retry dif
     const STDIN_THRESHOLD = 8000;
     const usePipe = task.length > STDIN_THRESHOLD;
 
-    const args: string[] = ['--output-format', 'json', '--append-system-prompt-file', systemFile];
+    const isRootAgent = process.getuid?.() === 0;
+    const args: string[] = ['--output-format', 'json', ...(isRootAgent ? [] : ['--dangerously-skip-permissions']), '--append-system-prompt-file', systemFile];
+    const defaultTools = 'Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch,TodoWrite';
+    if (isRootAgent) {
+      args.push('--allowedTools', allowedTools && allowedTools.length > 0 ? allowedTools.join(',') : defaultTools);
+    } else if (allowedTools && allowedTools.length > 0) {
+      args.push('--allowedTools', allowedTools.join(','));
+    }
     if (usePipe) {
       args.push('-p');
     } else {
       args.push('-p', task);
-    }
-    if (allowedTools && allowedTools.length > 0) {
-      args.push('--allowedTools', allowedTools.join(','));
     }
 
     try {

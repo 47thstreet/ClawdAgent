@@ -24,6 +24,7 @@ import { SSHTool } from '../agents/tools/ssh-tool.js';
 import { TradingTool } from '../agents/tools/trading-tool.js';
 import { RAGTool } from '../agents/tools/rag-tool.js';
 import { WhatsAppTool } from '../agents/tools/whatsapp-tool.js';
+import { FalTool } from '../agents/tools/fal-tool.js';
 import { BaseTool, ToolResult } from '../agents/tools/base-tool.js';
 import { hasPermission } from '../security/roles.js';
 import { audit } from '../security/audit-log.js';
@@ -44,11 +45,13 @@ import type { ToolCreator } from './tool-creator.js';
 // Tracking context — set by engine.ts before each message processing cycle
 let currentAgentId = 'system';
 let currentIntent = 'unknown';
+let currentPlatform = 'web';
 
 /** Set execution context for intelligence tracking */
-export function setExecutionContext(agentId: string, intent: string): void {
+export function setExecutionContext(agentId: string, intent: string, platform?: string): void {
   currentAgentId = agentId;
   currentIntent = intent;
+  if (platform) currentPlatform = platform;
 }
 
 // Singleton tool instances
@@ -98,6 +101,7 @@ export function initTools(): void {
   toolInstances.set('trading', new TradingTool());
   toolInstances.set('rag', new RAGTool());
   toolInstances.set('whatsapp', new WhatsAppTool());
+  toolInstances.set('fal', new FalTool());
 
   // Apply config-driven overrides (TOOLS_DISABLED env var)
   const registry = getToolRegistry();
@@ -277,11 +281,11 @@ export function getToolDefinitions(allowedTools: string[]): any[] {
   if (allowedTools.includes('social')) {
     definitions.push({
       name: 'social',
-      description: 'Publish content to social media via Blotato. Platforms: twitter, instagram, facebook, linkedin, tiktok, youtube, threads, bluesky, pinterest. Actions: publish(platform, text, mediaUrls), publish_all(text, mediaUrls, platforms), publish_thread(platform, posts[]), upload_media(url), check_post(postSubmissionId), schedule(platform, text, scheduledAt).',
+      description: 'Publish content to social media via Blotato. Platforms: twitter, instagram, facebook, linkedin, tiktok, youtube, threads, bluesky, pinterest. Dual accounts: tiktok and twitter have 2 accounts each — publish_all auto-publishes to both. Actions: publish(platform, text, mediaUrls), publish_all(text, mediaUrls, platforms, includeSecondary?), publish_multi_account(platform, text, mediaUrls), publish_thread(platform, posts[]), upload_media(url), check_post(postSubmissionId), schedule(platform, text, scheduledAt).',
       input_schema: {
         type: 'object' as const,
         properties: {
-          action: { type: 'string' as const, enum: ['publish', 'publish_all', 'publish_thread', 'upload_media', 'check_post', 'schedule'], description: 'Social media action' },
+          action: { type: 'string' as const, enum: ['publish', 'publish_all', 'publish_multi_account', 'publish_thread', 'upload_media', 'check_post', 'schedule'], description: 'Social media action' },
           platform: { type: 'string' as const, description: 'Target platform (twitter, instagram, facebook, linkedin, tiktok, youtube, threads, bluesky, pinterest)' },
           platforms: { type: 'array' as const, items: { type: 'string' as const }, description: 'Multiple platforms (for publish_all)' },
           text: { type: 'string' as const, description: 'Post text/caption' },
@@ -290,6 +294,7 @@ export function getToolDefinitions(allowedTools: string[]): any[] {
           postSubmissionId: { type: 'string' as const, description: 'Post ID (for check_post)' },
           url: { type: 'string' as const, description: 'Media URL (for upload_media)' },
           scheduledAt: { type: 'string' as const, description: 'ISO datetime for scheduled posts' },
+          includeSecondary: { type: 'boolean' as const, description: 'Include secondary accounts in publish_all (default true)' },
           options: { type: 'object' as const, description: 'Platform-specific options (mediaType, isAiGenerated, title, privacy, etc.)' },
         },
         required: ['action'],
@@ -703,6 +708,29 @@ export function getToolDefinitions(allowedTools: string[]): any[] {
     });
   }
 
+  if (allowedTools.includes('fal')) {
+    definitions.push({
+      name: 'fal',
+      description: 'AI Image & Video generation via fal.ai — FLUX, Stable Diffusion, Kling, Wan, Minimax, Recraft, and more. IMAGE: image_flux_dev, image_flux_schnell, image_flux_pro, image_flux_ultra, image_sd3, image_sdxl, image_recraft, image_ideogram. VIDEO: video_minimax, video_wan, video_wan_i2v, video_kling, video_luma, video_hunyuan. UPSCALE: upscale_creative, upscale_clarity, upscale_aura. UTILITY: remove_bg, inpaint, face_swap. Actions: alias-based generation (e.g. action=image_flux_dev), generate(model, prompt), status(requestId, model), result(requestId, model), cancel(requestId, model), list_models.',
+      input_schema: {
+        type: 'object' as const,
+        properties: {
+          action: { type: 'string' as const, description: 'Action: model alias name, generate, status, result, cancel, list_models' },
+          prompt: { type: 'string' as const, description: 'Generation prompt' },
+          image_url: { type: 'string' as const, description: 'Input image URL (for img2v, upscale, remove_bg, inpaint, face_swap)' },
+          video_url: { type: 'string' as const, description: 'Input video URL' },
+          model: { type: 'string' as const, description: 'fal.ai model endpoint ID (for generate action)' },
+          image_size: { type: 'string' as const, description: 'Image size: square_hd, landscape_4_3, portrait_4_3, landscape_16_9, portrait_16_9' },
+          num_images: { type: 'number' as const, description: 'Number of images (default 1)' },
+          seed: { type: 'number' as const, description: 'Seed for reproducibility' },
+          requestId: { type: 'string' as const, description: 'Request ID (for status/result/cancel)' },
+          params: { type: 'object' as const, description: 'Additional model-specific parameters' },
+        },
+        required: ['action'],
+      },
+    });
+  }
+
   // Append tools from plugins (if bridged)
   if (pluginLoaderRef) {
     for (const pt of pluginLoaderRef.getAllPluginTools()) {
@@ -783,7 +811,7 @@ const TOOL_TIMEOUTS: Record<string, number> = {
   'email': 30000,         // 30s — Gmail API
   'kie': 300000,          // 5min — video/image generation can take a while
   'social': 30000,        // 30s — social media API
-  'openclaw': 60000,      // 1min — bridge call (agent mode can be slow)
+  'openclaw': 150000,     // 2.5min — bridge agent mode needs time for AI response
   'auto': 600000,         // 10min — multi-step autonomous
   'device': 60000,        // 1min — ADB/Appium commands
   'elevenlabs': 120000,   // 2min — TTS/podcast/audio generation
@@ -792,6 +820,7 @@ const TOOL_TIMEOUTS: Record<string, number> = {
   'apify': 300000,        // 5min — actor runs can take time
   'ssh': 300000,          // 5min — scans and workflows can take time
   'trading': 60000,        // 1min — exchange API calls
+  'fal': 300000,            // 5min — image/video generation
 };
 const DEFAULT_TOOL_TIMEOUT = 30000; // 30s default
 
@@ -877,21 +906,27 @@ export async function executeTool(
   }
 
   // ── Approval Gate: require human approval for high-risk tools ──
+  // Auto-approve for authenticated platforms (web, whatsapp, telegram, discord)
   const approvalConfig = APPROVAL_REQUIRED_TOOLS[toolName];
   if (approvalConfig) {
-    const gate = getApprovalGate();
-    const inputSummary = JSON.stringify(input).slice(0, 200);
-    const approved = await gate.requestApproval({
-      agentId: currentAgentId,
-      action: `${toolName}:execute`,
-      description: `Tool "${toolName}" called by ${currentAgentId}: ${inputSummary}`,
-      riskCategory: approvalConfig.riskCategory,
-      riskScore: approvalConfig.riskScore,
-      timeoutMs: approvalConfig.timeoutMs,
-    });
-    if (!approved) {
-      logger.info('Tool blocked by approval gate', { toolName, agent: currentAgentId });
-      return { success: false, output: '', error: `Tool "${toolName}" requires human approval. Action was not approved.` };
+    const authenticatedPlatforms = ['web', 'whatsapp', 'telegram', 'discord'];
+    if (authenticatedPlatforms.includes(currentPlatform)) {
+      logger.info('Tool auto-approved for authenticated platform', { toolName, platform: currentPlatform, agent: currentAgentId });
+    } else {
+      const gate = getApprovalGate();
+      const inputSummary = JSON.stringify(input).slice(0, 200);
+      const approved = await gate.requestApproval({
+        agentId: currentAgentId,
+        action: `${toolName}:execute`,
+        description: `Tool "${toolName}" called by ${currentAgentId}: ${inputSummary}`,
+        riskCategory: approvalConfig.riskCategory,
+        riskScore: approvalConfig.riskScore,
+        timeoutMs: approvalConfig.timeoutMs,
+      });
+      if (!approved) {
+        logger.info('Tool blocked by approval gate', { toolName, agent: currentAgentId });
+        return { success: false, output: '', error: `Tool "${toolName}" requires human approval. Action was not approved.` };
+      }
     }
   }
 

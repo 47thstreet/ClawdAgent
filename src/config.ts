@@ -17,6 +17,8 @@ const configSchema = z.object({
   WHATSAPP_ENABLED: z.string().default('false').transform(v => v === 'true'),
   WHATSAPP_SESSION_PATH: z.string().default('./data/whatsapp-session'),
   WHATSAPP_ADMIN_IDS: z.string().optional().transform(v => v?.split(',').map(s => s.trim()).filter(Boolean) ?? []),
+  // WhatsApp IDs/group IDs to ignore completely (no response). Comma-separated.
+  WHATSAPP_IGNORE_IDS: z.string().optional().transform(v => v?.split(',').map(s => s.trim()).filter(Boolean) ?? []),
   // Deny-by-default: when 'allowlist', only admin IDs can use each platform (safe default)
   CHANNEL_SECURITY_MODE: z.enum(['open', 'allowlist']).default('allowlist'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
@@ -110,6 +112,10 @@ const configSchema = z.object({
   BLOTATO_ACCOUNT_BLUESKY: z.string().optional(),
   BLOTATO_ACCOUNT_PINTEREST: z.string().optional(),
   BLOTATO_FACEBOOK_PAGE_ID: z.string().optional(),
+  BLOTATO_ACCOUNT_TIKTOK_2: z.string().optional(),
+  BLOTATO_ACCOUNT_TWITTER_2: z.string().optional(),
+  // fal.ai (AI Image/Video Inference)
+  FAL_AI_API_KEY: z.string().optional(),
   // Provider mode: auto | economy | pro | max | local
   PROVIDER_MODE: z.enum(['auto', 'economy', 'pro', 'max', 'local']).default('auto'),
   // Claude Code CLI (FREE via Max subscription — $200/month flat)
@@ -118,6 +124,10 @@ const configSchema = z.object({
   // OpenClaw bridge
   OPENCLAW_GATEWAY_TOKEN: z.string().optional(),
   OPENCLAW_GATEWAY_PORT: z.coerce.number().default(18789),
+  OPENCLAW_DEVICE_ID: z.string().optional(),
+  OPENCLAW_DEVICE_PUBLIC_KEY: z.string().optional(),
+  OPENCLAW_DEVICE_PRIVATE_KEY: z.string().optional(),
+  OPENCLAW_DEVICE_TOKEN: z.string().optional(),
 
   // Crypto Trading
   TRADING_ENABLED: z.string().default('false').transform(v => v === 'true'),

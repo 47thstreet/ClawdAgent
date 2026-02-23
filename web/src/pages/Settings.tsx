@@ -5,7 +5,7 @@ import { api } from '../api/client';
 import {
   Settings as SettingsIcon, LogOut, Key, Globe, Bot, DollarSign,
   Eye, EyeOff, CheckCircle, XCircle, Loader2, Save, TestTube, Terminal,
-  Server, Plus, Trash2, Wifi, WifiOff, TrendingUp
+  Server, Plus, Trash2, Wifi, WifiOff, TrendingUp, Zap
 } from 'lucide-react';
 
 export default function Settings() {
@@ -15,7 +15,7 @@ export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [activeTab, setActiveTab] = useState<'keys' | 'services' | 'budget' | 'general' | 'cli' | 'servers' | 'exchanges'>('keys');
+  const [activeTab, setActiveTab] = useState<'keys' | 'services' | 'budget' | 'general' | 'cli' | 'servers' | 'exchanges' | 'evolution'>('keys');
   const [cliStatus, setCliStatus] = useState<{ available: boolean; authenticated: boolean; cliPath: string; lastCheckAt: number } | null>(null);
   const [cliLoading, setCLILoading] = useState(false);
   const [cliMessage, setCLIMessage] = useState('');
@@ -112,6 +112,7 @@ export default function Settings() {
     { id: 'exchanges' as const, label: 'Exchanges', icon: TrendingUp },
     { id: 'budget' as const, label: 'Budget', icon: DollarSign },
     { id: 'cli' as const, label: 'Claude CLI', icon: Terminal },
+    { id: 'evolution' as const, label: 'Updates', icon: Zap },
     { id: 'general' as const, label: 'General', icon: Bot },
   ];
 
@@ -603,6 +604,100 @@ export default function Settings() {
                 <li>The CLI authenticates automatically — no API key needed</li>
                 <li>All AI requests use your Max subscription at <strong className="text-green-400">zero cost</strong></li>
               </ol>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'evolution' && (
+          <div className="space-y-6">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold mb-1">Updates & Evolution</h2>
+              <p className="text-sm text-gray-400">Control how the system discovers and applies updates. Choose between automatic updates, notifications, or fully manual mode.</p>
+            </div>
+
+            {/* Evolution Mode */}
+            <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
+              <h3 className="font-medium mb-3">Evolution Mode</h3>
+              <div className="space-y-3">
+                {[
+                  { value: 'auto', label: 'Auto', desc: 'System discovers and auto-applies safe updates (skills, models, tools)' },
+                  { value: 'notify', label: 'Notify Only', desc: 'System discovers updates but only sends notifications — you decide what to apply' },
+                  { value: 'disabled', label: 'Disabled', desc: 'No scanning, no notifications — fully manual' },
+                ].map(opt => (
+                  <label key={opt.value} className="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-dark-900 transition-colors">
+                    <input
+                      type="radio"
+                      name="evolutionMode"
+                      value={opt.value}
+                      checked={(settings?.evolution?.evolutionMode ?? 'notify') === opt.value}
+                      onChange={() => setSettings({ ...settings, evolution: { ...settings?.evolution, evolutionMode: opt.value } })}
+                      className="mt-0.5 accent-primary-600"
+                    />
+                    <div>
+                      <p className="font-medium text-sm">{opt.label}</p>
+                      <p className="text-xs text-gray-500">{opt.desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Notification Preferences */}
+            <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
+              <h3 className="font-medium mb-3">Notification Preferences</h3>
+              <div className="space-y-3">
+                {[
+                  { key: 'notifyNewModels', label: 'New Models', desc: 'Notify when new AI models are released (Claude, GPT, Gemini, etc.)' },
+                  { key: 'notifyPriceChanges', label: 'Price Changes', desc: 'Notify when model pricing changes' },
+                  { key: 'notifyDeprecations', label: 'Deprecations', desc: 'Notify when models are removed or deprecated' },
+                  { key: 'autoUpdateSkills', label: 'Auto-Update Skills', desc: 'Automatically install new skills from configured sources' },
+                  { key: 'autoUpdateModels', label: 'Auto-Update Model Config', desc: 'Automatically update model routing when better models are found' },
+                ].map(item => (
+                  <label key={item.key} className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings?.evolution?.[item.key] ?? (item.key === 'autoUpdateSkills' || item.key === 'notifyNewModels' || item.key === 'notifyDeprecations')}
+                      onChange={(e) => setSettings({ ...settings, evolution: { ...settings?.evolution, [item.key]: e.target.checked } })}
+                      className="w-4 h-4 rounded border-gray-600 bg-dark-900 accent-primary-600"
+                    />
+                    <div>
+                      <p className="text-sm font-medium">{item.label}</p>
+                      <p className="text-xs text-gray-500">{item.desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Scan Intervals */}
+            <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
+              <h3 className="font-medium mb-3">Scan Intervals</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">LLM Model Scan (hours)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="168"
+                    value={settings?.evolution?.ecosystemScanIntervalHours ?? 6}
+                    onChange={(e) => setSettings({ ...settings, evolution: { ...settings?.evolution, ecosystemScanIntervalHours: parseInt(e.target.value) || 6 } })}
+                    className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm"
+                  />
+                  <p className="text-[11px] text-gray-600 mt-1">How often to check for new models and price changes</p>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Ecosystem Scan (hours)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="168"
+                    value={settings?.evolution?.skillScanIntervalHours ?? 24}
+                    onChange={(e) => setSettings({ ...settings, evolution: { ...settings?.evolution, skillScanIntervalHours: parseInt(e.target.value) || 24 } })}
+                    className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm"
+                  />
+                  <p className="text-[11px] text-gray-600 mt-1">How often to scan GitHub/npm for new tools and skills</p>
+                </div>
+              </div>
             </div>
           </div>
         )}

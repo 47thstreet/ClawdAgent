@@ -3,6 +3,7 @@ import { registerAgent, unregisterAgent, getAgent, getAllAgents, hasAgent } from
 import { AIClient } from './ai-client.js';
 import { SkillsEngine } from './skills-engine.js';
 import { extractJSON } from '../utils/helpers.js';
+import { scanForInjection } from '../security/content-guard.js';
 import logger from '../utils/logger.js';
 
 const MAX_DYNAMIC_AGENTS = 5;
@@ -60,6 +61,17 @@ Respond with ONLY valid JSON.`,
       }
 
       if (!plan.id || !plan.name || !plan.systemPrompt) return null;
+
+      // Security: validate AI-generated system prompt for injection patterns
+      const injectionCheck = scanForInjection(plan.systemPrompt);
+      if (injectionCheck.detected) {
+        logger.error('AI-generated agent prompt BLOCKED — injection patterns detected', {
+          agentId: plan.id,
+          patterns: injectionCheck.patterns,
+          score: injectionCheck.score,
+        });
+        return null;
+      }
 
       // Enforce limits — evict LRU if needed
       this.enforceLimits();

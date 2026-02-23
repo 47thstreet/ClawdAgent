@@ -29,6 +29,7 @@ import { extractJSON } from '../utils/helpers.js';
 import logger from '../utils/logger.js';
 
 import { detectSocialEngineering } from '../security/content-guard.js';
+import { scanMessage as guardScanMessage } from '../security/message-guard.js';
 
 // ─── Output Secret Filter ──────────────────────────────────────────
 // Prevents LLM from leaking API keys, tokens, or secrets in responses.
@@ -343,6 +344,13 @@ export class Engine {
     }
 
     try {
+      // Quick mode also gets message guard protection
+      const quickGuard = guardScanMessage(incoming.text, incoming.userId);
+      if (quickGuard.blocked) {
+        logger.error('Quick message BLOCKED by guard', { userId: incoming.userId, score: quickGuard.score });
+        return { text: '⛔ ההודעה נחסמה על ידי מערכת האבטחה.', format: 'text', agentUsed: 'message-guard', provider: 'local' };
+      }
+
       incoming.onProgress?.({ type: 'status', message: '⚡ Quick mode — fast response' });
 
       // Load history (enough for conversation continuity)
@@ -511,6 +519,29 @@ export class Engine {
       return { text: responseText, format: 'markdown', agentUsed: 'system', provider: 'local' };
     }
 
+    // ── 0a. Message Guard — pre-AI security scan ──
+    const guardResult = guardScanMessage(incoming.text, incoming.userId);
+    if (guardResult.blocked) {
+      logger.error('Message BLOCKED by message guard', {
+        userId: incoming.userId,
+        score: guardResult.score,
+        flags: guardResult.flags.slice(0, 5),
+      });
+      return {
+        text: '⛔ ההודעה נחסמה על ידי מערכת האבטחה. זוהו דפוסים חשודים בתוכן.',
+        format: 'text',
+        agentUsed: 'message-guard',
+        provider: 'local',
+      };
+    }
+    if (!guardResult.safe) {
+      logger.warn('Message flagged by message guard', {
+        userId: incoming.userId,
+        score: guardResult.score,
+        flags: guardResult.flags.slice(0, 5),
+      });
+    }
+
     // ── 0b. Determine response mode ──
     const userMode = incoming.responseMode ?? userModeOverrides.get(incoming.userId) ?? 'auto';
     const effectiveMode = userMode === 'auto' ? autoDetectMode(incoming.text) : userMode;
@@ -551,11 +582,11 @@ export class Engine {
         this.desktopVision
       ) {
         // Approval gate — desktop control is high-risk
-        // Auto-approve for authenticated web users (they explicitly typed the command)
-        let approved = incoming.platform === 'web';
+        // Auto-approve for authenticated users on any platform (they explicitly typed the command)
+        let approved = ['web', 'whatsapp', 'telegram', 'discord'].includes(incoming.platform);
         if (approved) {
-          incoming.onProgress?.({ type: 'status', message: 'Auto-approved desktop control (web user)' });
-          logger.info('Approval auto-granted for web user', { userId: incoming.userId, action: `desktop:${routing.intent}` });
+          incoming.onProgress?.({ type: 'status', message: `Auto-approved desktop control (${incoming.platform} user)` });
+          logger.info('Approval auto-granted for authenticated user', { userId: incoming.userId, action: `desktop:${routing.intent}` });
         } else {
           const gate = getApprovalGate();
           approved = await gate.requestApproval({
@@ -596,11 +627,11 @@ export class Engine {
       // 2b. Project Builder — intercept build_project intent
       if (routing.intent === Intent.BUILD_PROJECT) {
         // Approval gate — building projects creates files/directories
-        // Auto-approve for authenticated web users (they explicitly typed the command)
-        let approved = incoming.platform === 'web';
+        // Auto-approve for authenticated users on any platform (they explicitly typed the command)
+        let approved = ['web', 'whatsapp', 'telegram', 'discord'].includes(incoming.platform);
         if (approved) {
-          incoming.onProgress?.({ type: 'status', message: 'Auto-approved project build (web user)' });
-          logger.info('Approval auto-granted for web user', { userId: incoming.userId, action: 'build_project' });
+          incoming.onProgress?.({ type: 'status', message: `Auto-approved project build (${incoming.platform} user)` });
+          logger.info('Approval auto-granted for authenticated user', { userId: incoming.userId, action: 'build_project' });
         } else {
           const gate = getApprovalGate();
           approved = await gate.requestApproval({
@@ -747,11 +778,11 @@ If they want to check a running project, use "status" with projectName.`,
           let responseText: string;
           if (plan.action === 'send') {
             // Approval gate — sending email is irreversible
-            // Auto-approve for authenticated web users (they explicitly typed the command)
-            let emailApproved = incoming.platform === 'web';
+            // Auto-approve for authenticated users on any platform (they explicitly typed the command)
+            let emailApproved = ['web', 'whatsapp', 'telegram', 'discord'].includes(incoming.platform);
             if (emailApproved) {
-              incoming.onProgress?.({ type: 'status', message: `Auto-approved email send to ${plan.to} (web user)` });
-              logger.info('Approval auto-granted for web user', { userId: incoming.userId, action: 'email:send' });
+              incoming.onProgress?.({ type: 'status', message: `Auto-approved email send to ${plan.to} (${incoming.platform} user)` });
+              logger.info('Approval auto-granted for authenticated user', { userId: incoming.userId, action: 'email:send' });
             } else {
               const gate = getApprovalGate();
               emailApproved = await gate.requestApproval({
@@ -1132,8 +1163,8 @@ If they want to check a running project, use "status" with projectName.`,
       });
       const thinkingConfig = mapEffortToThinking(effortLevel, selectedProvider ?? 'anthropic');
 
-      // ── Intelligence: set execution context so tool-executor tracks agent/intent ──
-      setExecutionContext(agent.id, routing.intent);
+      // ── Intelligence: set execution context so tool-executor tracks agent/intent/platform ──
+      setExecutionContext(agent.id, routing.intent, incoming.platform);
 
       // ── Crew Orchestrator: detect multi-agent tasks ──
       const crewConfig = this.shouldUseCrew(routing.intent, incoming.text, agent.id);
@@ -1245,12 +1276,21 @@ If they want to check a running project, use "status" with projectName.`,
       // Our system prompt override prevents most cases, but this filter catches any stragglers.
       if (response.content) {
         const approvalPatterns = [
+          // English patterns
           /(?:you['']?ll?\s+need\s+to\s+)?(?:click|press|tap)\s+['"]?Allow['"]?\s*(?:on\s+the\s+(?:popup|dialog|prompt|terminal))?/gi,
           /(?:pending|waiting\s+for)\s+tool\s+(?:request|approval|permission)s?/gi,
           /(?:please\s+)?(?:approve|allow|accept|confirm)\s+(?:the\s+)?tool\s+(?:request|use|call|execution)s?/gi,
           /I\s+(?:need|require)\s+(?:your\s+)?(?:permission|approval|authorization)\s+(?:to\s+(?:use|run|execute|access)\s+(?:the\s+)?(?:tool|command|search|browser))/gi,
           /(?:the\s+tool\s+(?:request|call)\s+(?:is|was)\s+(?:pending|blocked|waiting))/gi,
           /(?:you\s+(?:should|need\s+to|can)\s+(?:see|find)\s+a\s+(?:popup|dialog|prompt|notification)\s+(?:in\s+(?:the|your)\s+terminal))/gi,
+          /I\s+(?:need|require|want)\s+(?:your\s+)?(?:permission|approval|confirmation)\s+(?:to\s+(?:write|read|edit|delete|create|modify|access|update)\s+)/gi,
+          /(?:please\s+)?(?:grant|give)\s+(?:me\s+)?(?:permission|access|approval)\s+(?:to|for)\s+/gi,
+          // Hebrew patterns — "אני צריך אישור", "תאשר את", "אני דורש הרשאה", etc.
+          /\u05D0\u05E0\u05D9\s+(?:\u05E6\u05E8\u05D9\u05DA|\u05D3\u05D5\u05E8\u05E9|\u05E8\u05D5\u05E6\u05D4|\u05DE\u05D1\u05E7\u05E9)\s+(?:\u05D0\u05D9\u05E9\u05D5\u05E8|\u05D4\u05E8\u05E9\u05D0\u05D4|\u05D0\u05D9\u05E9\u05D5\u05E8\u05DA)/gi,
+          /\u05EA\u05D0\u05E9\u05E8\s+(?:\u05D0\u05EA\s+)?(?:\u05D4)?(?:\u05DB\u05EA\u05D9\u05D1\u05D4|\u05D2\u05D9\u05E9\u05D4|\u05E4\u05E2\u05D5\u05DC\u05D4|\u05E9\u05D9\u05DE\u05D5\u05E9|\u05E7\u05E8\u05D9\u05D0\u05D4|\u05DE\u05D7\u05D9\u05E7\u05D4|\u05E2\u05E8\u05D9\u05DB\u05D4)/gi,
+          /\u05E6\u05E8\u05D9\u05DA\s+(?:\u05D0\u05D9\u05E9\u05D5\u05E8|\u05D4\u05E8\u05E9\u05D0\u05D4)\s+(?:\u05DC|\u05DB\u05D3\u05D9)/gi,
+          /\u05D0\u05D9\u05E9\u05D5\u05E8\s+(?:\u05DB\u05EA\u05D9\u05D1\u05D4|\u05E7\u05E8\u05D9\u05D0\u05D4|\u05D2\u05D9\u05E9\u05D4|\u05E9\u05D9\u05DE\u05D5\u05E9)\s+\u05DC/gi,
+          /\u05D4\u05D0\u05DD\s+(?:\u05D0\u05EA\u05D4?\s+)?(?:\u05DE\u05D0\u05E9\u05E8|\u05DE\u05E8\u05E9\u05D4)\s+\u05DC\u05D9/gi,
         ];
         let cleaned = response.content;
         for (const pattern of approvalPatterns) {

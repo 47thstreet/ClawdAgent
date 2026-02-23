@@ -6,10 +6,19 @@ import logger from '../../utils/logger.js';
 
 export function setupHandlers(client: WAClient, engine: Engine) {
   const adminIds = config.WHATSAPP_ADMIN_IDS;
+  const ignoreIds = (config as any).WHATSAPP_IGNORE_IDS as string[] ?? [];
   const denyByDefault = config.CHANNEL_SECURITY_MODE === 'allowlist';
 
   client.on('message', async (msg) => {
     if (msg.fromMe) return;
+
+    // Ignore list — silently skip specific contacts/groups (e.g., family group)
+    if (ignoreIds.length > 0) {
+      const chatId = msg.from;
+      if (ignoreIds.some(id => chatId.includes(id))) {
+        return; // Silently ignore — no response, no log
+      }
+    }
 
     // Allowlist guard — deny-by-default security (matches Telegram/Discord pattern)
     if (denyByDefault && adminIds.length > 0) {

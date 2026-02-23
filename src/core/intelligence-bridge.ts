@@ -113,8 +113,13 @@ export function onToolExecuted(params: {
     }
 
     // 4. Memory — record failure for clustering + kill-switch wiring
+    // Exclude non-critical / background sync tools from panic trigger to avoid
+    // false-positive PANIC activations from intermittent connectivity issues.
+    const PANIC_EXEMPT_TOOLS = new Set(['openclaw', 'search', 'email', 'rag']);
     if (!params.success) {
-      recordFailureForPanic(); // Feed failure to auto-panic (10+ failures/hour = panic)
+      if (!PANIC_EXEMPT_TOOLS.has(params.toolId)) {
+        recordFailureForPanic(); // Feed failure to auto-panic (10+ failures/hour = panic)
+      }
       memory?.recordFailure(
         `tool_${params.toolId}_failure`,
         `Tool ${params.toolId} failed during ${params.intent}`,
@@ -138,7 +143,9 @@ export function checkCommandSafety(command: string, context?: {
   agentId?: string;
 }): SafetyCheckResult {
   if (!safety || !governance) {
-    return { approved: true, riskCategory: 'unknown', riskScore: 0, reason: 'Safety subsystems not initialized', requiresSnapshot: false };
+    // Fail-closed: deny if safety subsystems aren't ready (prevents bypass during startup)
+    logger.warn('Command safety check denied — subsystems not initialized');
+    return { approved: false, riskCategory: 'unknown', riskScore: 10, reason: 'Safety subsystems not initialized — fail-closed', requiresSnapshot: false };
   }
 
   try {
@@ -151,8 +158,9 @@ export function checkCommandSafety(command: string, context?: {
       requiresSnapshot: sim.rollbackPlan?.requiresSnapshot ?? false,
     };
   } catch (err: any) {
-    logger.debug('Intelligence bridge: safety check error', { error: err.message });
-    return { approved: true, riskCategory: 'unknown', riskScore: 0, reason: 'Safety check failed — allowing by default', requiresSnapshot: false };
+    // Fail-closed: deny on safety check error (never allow unknown state)
+    logger.error('Command safety check error — denying', { error: err.message });
+    return { approved: false, riskCategory: 'unknown', riskScore: 10, reason: `Safety check error — blocked: ${err.message}`, requiresSnapshot: false };
   }
 }
 
@@ -345,13 +353,18 @@ export function requestGovernanceApproval(params: {
   estimatedCost: number;
   riskLevel: 'safe' | 'change' | 'critical' | 'destructive';
 }): { approved: boolean; reason: string } {
-  if (!governance) return { approved: true, reason: 'Governance not initialized' };
+  if (!governance) {
+    // Fail-closed: deny if governance not initialized
+    logger.warn('Governance approval denied — engine not initialized');
+    return { approved: false, reason: 'Governance engine unavailable — fail-closed' };
+  }
 
   try {
     return governance.requestApproval(params.agentId, params.action, params.estimatedCost);
   } catch (err: any) {
-    logger.debug('Intelligence bridge: governance error', { error: err.message });
-    return { approved: true, reason: 'Governance check failed — allowing by default' };
+    // Fail-closed: deny on governance error
+    logger.error('Governance approval error — denying', { error: err.message });
+    return { approved: false, reason: `Governance error — blocked: ${err.message}` };
   }
 }
 

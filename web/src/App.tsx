@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import Login from './pages/Login';
@@ -18,7 +18,10 @@ import Knowledge from './pages/Knowledge';
 import Intelligence from './pages/Intelligence';
 import Graph from './pages/Graph';
 import OpenClaw from './pages/OpenClaw';
+import Evolution from './pages/Evolution';
+import ToastContainer, { pushToast } from './components/shared/ToastContainer';
 import { useAuthStore } from './stores/auth';
+import { useNotificationsStore } from './stores/notifications';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token);
@@ -52,9 +55,43 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return token ? <>{children}</> : <Navigate to="/login" />;
 }
 
+/** Global WebSocket listener for real-time notifications */
+function NotificationWSListener() {
+  const token = useAuthStore((s) => s.token);
+  const addFromWebSocket = useNotificationsStore((s) => s.addFromWebSocket);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${window.location.host}`, token);
+    wsRef.current = ws;
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'notification' && msg.data) {
+          addFromWebSocket(msg.data);
+          // Show toast for warning/critical severity
+          if (msg.data.severity === 'warning' || msg.data.severity === 'critical') {
+            pushToast({ title: msg.data.title, body: msg.data.body, severity: msg.data.severity });
+          }
+        }
+      } catch { /* ignore parse errors */ }
+    };
+
+    return () => { ws.close(); wsRef.current = null; };
+  }, [token, addFromWebSocket]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
+      <NotificationWSListener />
+      <ToastContainer />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
@@ -69,6 +106,7 @@ export default function App() {
           <Route path="trading" element={<Trading />} />
           <Route path="knowledge" element={<Knowledge />} />
           <Route path="intelligence" element={<Intelligence />} />
+          <Route path="evolution" element={<Evolution />} />
           <Route path="graph" element={<Graph />} />
           <Route path="costs" element={<Costs />} />
           <Route path="logs" element={<Logs />} />

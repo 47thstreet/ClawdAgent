@@ -4,14 +4,14 @@
 
 ### The Autonomous AI Octopus
 
-**28,500+ lines of TypeScript. 51 core modules. 18 agents. 29 tools. 74 skills. 5 platforms. 3 protocols. 1 brain.**
+**v6.1 — 28,500+ lines of TypeScript. 51 core modules. 18 agents. 29 tools. 74 skills. 5 platforms. 3 protocols. 1 brain.**
 
 An open-source autonomous AI agent that thinks, learns, evolves, and never stops.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
-[![Claude](https://img.shields.io/badge/AI-Claude%204-purple.svg)](https://anthropic.com/)
+[![Claude](https://img.shields.io/badge/AI-Claude%204.6-purple.svg)](https://anthropic.com/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 [Quick Start](#-quick-start) | [Features](#-features) | [Architecture](#-architecture) | [Docs](#-documentation) | [Contributing](#-contributing)
@@ -22,49 +22,120 @@ An open-source autonomous AI agent that thinks, learns, evolves, and never stops
 
 ## What is ClawdAgent?
 
-ClawdAgent is a **fully autonomous AI agent system** that runs 24/7 across multiple platforms. It doesn't just respond to commands — it **thinks proactively**, **learns from interactions**, **evolves its own capabilities**, and **manages complex multi-step workflows** autonomously.
+ClawdAgent is the **most comprehensive autonomous AI agent system** ever built as open-source. It runs 24/7 across multiple platforms, with **12-layer security**, **9 intelligence subsystems**, **18 specialized agents**, **29 tools**, and **74 skills** — all connected through a unified brain.
 
-Think of it as your personal AI operations center: it manages your servers, writes your code, creates content, trades crypto, automates your phone, monitors your systems — all while learning and getting smarter over time.
+It doesn't just respond to commands — it **thinks proactively**, **learns from interactions**, **evolves its own capabilities**, **secures itself against attacks**, and **manages complex multi-step workflows** autonomously.
+
+Think of it as your personal AI operations center: it manages your servers, writes your code, creates content, trades crypto, automates your phone, monitors your systems, publishes to 9 social platforms — all while learning and getting smarter over time.
 
 ```
 You: "Check my servers, fix anything broken, and send me a summary on Telegram"
 ClawdAgent: ✅ SSH'd into 3 servers → found nginx down on VPS2 → restarted it
             → checked SSL certs (2 expiring soon) → renewed them
+            → generated AI image for the report header
             → sent you a full report on Telegram with recommendations
+            → scheduled daily health checks via cron
+            → learned the fix pattern for next time
+```
+
+```
+You: "Create a marketing video about our product and publish it everywhere"
+ClawdAgent: ✅ Generated script with AI → created video via Kie.ai
+            → generated thumbnail via fal.ai (FLUX)
+            → published to Twitter, Instagram, TikTok, LinkedIn, YouTube, Facebook
+            → scheduled follow-up posts for peak engagement times
+            → tracked publishing costs ($0.12 total)
 ```
 
 ---
 
 ## Why ClawdAgent?
 
-| Feature | AutoGPT | CrewAI | LangChain | **ClawdAgent** |
-|---------|---------|--------|-----------|----------------|
-| Persistent Memory | Limited | No | Via plugins | **PostgreSQL + Redis + Memory Hierarchy** |
-| Self-Evolution | No | No | No | **Evolution Engine + Self-Repair + Auto-Learn** |
-| Proactive Thinking | No | No | No | **Thinks autonomously, spots problems** |
-| Multi-Platform Chat | No | No | No | **Telegram + Discord + WhatsApp + Web** |
-| Server Management | No | No | No | **SSH + Docker + Health Monitoring** |
-| Web Dashboard | Basic | No | Via LangSmith | **Full React Dashboard** |
-| Security Hardening | Basic | Basic | Basic | **Defense-in-Depth (12 layers)** |
-| Browser Automation | Via plugins | No | Via plugins | **Built-in Playwright (headless)** |
-| Content Creation | No | No | No | **AI Video/Image/Music + 9 social platforms** |
-| Dynamic Tool Creation | No | No | No | **Creates new tools at runtime** |
-| Cost Intelligence | No | No | Via callbacks | **ROI tracking + budget forecasting** |
-| Governance Engine | No | No | No | **Risk budgets + autonomy levels** |
-| Safety Simulator | No | No | No | **Dry-run testing + impact assessment** |
-| Intelligence Bridge | No | No | No | **9 interconnected subsystems** |
-| Multi-Agent Teams | No | Yes | No | **Crew Orchestrator + Meta Agent** |
-| A2A Protocol | No | No | No | **Full: Agent Card + Tasks + SSE** |
-| ACP Protocol | No | No | No | **Full: Runs + Agent Descriptor** |
-| MCP Protocol | No | No | No | **Deep: 9 servers, JSON-RPC 2.0** |
+### Core Capabilities
+
+| Capability | AutoGPT | CrewAI | LangChain | MetaGPT | OpenDevin | **ClawdAgent** |
+|-----------|---------|--------|-----------|---------|-----------|----------------|
+| Autonomous Execution | Partial | Task-based | Chain-based | Workflow | IDE-focused | **Full 24/7 autonomy** |
+| Persistent Memory | Limited | No | Via plugins | Partial | Session | **PostgreSQL + Redis + Memory Hierarchy** |
+| Self-Evolution | No | No | No | No | No | **Evolution Engine + Self-Repair + Auto-Learn** |
+| Proactive Thinking | No | No | No | No | No | **Autonomous: spots problems, sends alerts** |
+| Multi-Platform Chat | No | No | No | No | No | **Telegram + Discord + WhatsApp + Web** |
+| Web Dashboard | Basic | No | LangSmith | No | Browser | **Full React Dashboard (16 pages)** |
+| Dynamic Tool Creation | No | No | No | No | No | **Creates new tools at runtime** |
+| Multi-Agent Teams | No | Yes | No | Yes | No | **Crew Orchestrator + Meta Agent + Factory** |
+| Agent-to-Agent Protocols | No | No | No | No | No | **A2A + ACP + MCP (full compliance)** |
+
+### Security Comparison
+
+| Security Feature | AutoGPT | CrewAI | LangChain | MetaGPT | OpenDevin | **ClawdAgent** |
+|-----------------|---------|--------|-----------|---------|-----------|----------------|
+| Defense Layers | 1 | 1 | 2 | 1 | 2 | **12-layer defense-in-depth** |
+| Prompt Injection Guard | No | No | Basic | No | No | **20+ regex patterns + AI detection** |
+| Social Engineering Detection | No | No | No | No | No | **15 patterns, auto-block** |
+| Memory Integrity | No | No | No | No | No | **SHA-256 checksums + tamper quarantine** |
+| Audit Trail | No | No | No | No | No | **Tamper-evident hash chain** |
+| Command Sandboxing | No | No | No | No | Docker | **Bash sandbox + command guard** |
+| RBAC + JWT Auth | No | No | No | No | No | **Full RBAC + JWT + per-user perms** |
+| Kill Switch | No | No | No | No | No | **Emergency stop + cost tracking** |
+| Approval Gate | No | No | No | No | No | **Human-in-the-loop for critical ops** |
+| Governance Engine | No | No | No | No | No | **Risk budgets + autonomy levels** |
+| Fail-Closed Design | No | No | No | No | No | **All security checks fail-closed** |
+| Skill Scanning | No | No | No | No | No | **25+ patterns, severity scoring** |
+| Tool Integrity Hashing | No | No | No | No | No | **SHA-256 hash-pinning on tools** |
+| Encryption at Rest | No | No | No | No | No | **AES encryption + key rotation** |
+
+### Intelligence & AGI Readiness
+
+| Intelligence Feature | AutoGPT | CrewAI | LangChain | MetaGPT | OpenDevin | **ClawdAgent** |
+|---------------------|---------|--------|-----------|---------|-----------|----------------|
+| Multi-Model Support | GPT only | Multiple | Multiple | GPT-focused | Multiple | **Claude 4.6 + OpenRouter (400+) + Ollama + Claude Code** |
+| Smart Model Routing | No | No | No | No | No | **Auto-routes by complexity, cost, budget** |
+| Extended Thinking | No | No | No | No | No | **32K thinking tokens for deep reasoning** |
+| Intent Classification | Basic | No | No | Role-based | No | **45+ intents, multilingual (Hebrew, Arabic, CJK)** |
+| Intelligence Bridge | No | No | No | No | No | **9 subsystems: scoring, memory, governance, cost, routing, observability, goals, safety, feedback** |
+| Safety Simulator | No | No | No | No | No | **Dry-run testing + impact assessment + rollback** |
+| Cost Intelligence | No | No | Callbacks | No | No | **ROI tracking + budget forecasting + burn prediction** |
+| Behavior Adaptation | No | No | No | No | No | **Multi-language personality + adaptive styles** |
+| Goal Engine | No | No | No | No | No | **Self-initiated 30/60/90-day goals with KPIs** |
+| Feedback Loop | No | No | No | No | No | **Pattern recognition + prompt optimization** |
+
+### Tools & Integrations
+
+| Category | AutoGPT | CrewAI | LangChain | MetaGPT | OpenDevin | **ClawdAgent** |
+|----------|---------|--------|-----------|---------|-----------|----------------|
+| Built-in Tools | 5-10 | 5-8 | Via plugins | 5-10 | 10-15 | **29 integrated tools** |
+| Pre-loaded Skills | No | No | No | No | No | **74 skills, extensible at runtime** |
+| Server Management | No | No | No | No | No | **Multi-server SSH + Docker + health monitoring** |
+| Browser Automation | Via plugins | No | Via plugins | No | Built-in | **Playwright headless + AI vision** |
+| Content Creation | No | No | No | No | No | **AI video/image/music (Kie.ai 60+ models + fal.ai)** |
+| Social Publishing | No | No | No | No | No | **9 platforms (Twitter, IG, TikTok, LinkedIn, YT, FB, Threads, BlueSky, Pinterest)** |
+| Crypto Trading | No | No | No | No | No | **5 strategies + TA engine + risk manager** |
+| Mobile Automation | No | No | No | No | No | **Android via ADB/Appium** |
+| Desktop Control | No | No | No | No | No | **AI vision + mouse/keyboard** |
+| Email Integration | No | No | No | No | No | **Gmail API + SMTP** |
+| Voice (TTS/STT) | No | No | No | No | No | **ElevenLabs integration** |
+| Remote Agent Bridge | No | No | No | No | No | **OpenClaw (Ed25519 device auth)** |
+
+### Deployment & Operations
+
+| Feature | AutoGPT | CrewAI | LangChain | MetaGPT | OpenDevin | **ClawdAgent** |
+|---------|---------|--------|-----------|---------|-----------|----------------|
+| Production-Ready | Partial | Library | Library | Prototype | Beta | **PM2 + Docker + nginx production stack** |
+| One-Command Install | No | pip | pip | pip | Docker | **`bash install.sh` (interactive wizard)** |
+| Observability | Basic logs | No | LangSmith | No | No | **Timeline events + tool heatmaps + error clustering** |
+| Cron Scheduling | No | No | No | No | No | **Built-in cron + recurring tasks** |
+| Queue System | No | No | No | No | No | **BullMQ (4 job types, 5 parallel, 20 queue)** |
+| Self-Repair | No | No | No | No | No | **9 known fix patterns + AI diagnosis** |
+| Config Management | .env | Code | Code | Code | Docker | **Zod-validated .env + YAML hot-reload + Web UI** |
+| Open Source | Yes | Yes | Yes | Yes | Yes | **Apache 2.0 (patent + trademark protection)** |
 
 ---
 
 ## Features
 
 ### Core Intelligence — 51 Modules
-- **Multi-Model AI** — Claude (Anthropic), 400+ models via OpenRouter, local Ollama models
-- **Smart Model Router** — Picks the best model per task (complexity, cost, budget)
+- **Multi-Model AI** — Claude 4.6 (Anthropic), 400+ models via OpenRouter, local Ollama models, Claude Code CLI (free with Max)
+- **Smart Model Router** — Picks the best model per task (complexity, cost, budget) with 5 provider modes
 - **Extended Thinking** — Up to 32K thinking tokens for complex reasoning
 - **Streaming Responses** — Real-time token streaming across all platforms
 - **Intent Classification** — 45+ intents with multilingual support (Hebrew, Arabic, CJK)
@@ -73,6 +144,7 @@ ClawdAgent: ✅ SSH'd into 3 servers → found nginx down on VPS2 → restarted 
 - **Safety Simulator** — Dry-run testing of commands before execution, impact assessment, rollback planning
 - **Proactive Thinker** — Agent thinks autonomously: spots problems, finds opportunities, sends alerts
 - **Behavior Engine** — Multi-language personality variants, adaptive interaction styles
+- **OpenClaw Bridge** — Cryptographic device auth (Ed25519), remote agent execution, cron management
 
 ### Agent System — 18 Specialized Agents
 | Agent | Purpose |
@@ -97,7 +169,7 @@ ClawdAgent: ✅ SSH'd into 3 servers → found nginx down on VPS2 → restarted 
 | MRR Strategist | SaaS revenue optimization |
 
 ### Tool Ecosystem — 29 Integrated Tools
-`bash` `file` `search` `github` `task` `db` `browser` `kie` `social` `openclaw` `cron` `memory` `auto` `email` `workflow` `analytics` `claude-code` `device` `elevenlabs` `firecrawl` `rapidapi` `apify` `ssh` `trading` `rag` `whatsapp` `tikvid` `workflow` `auto-tool`
+`bash` `file` `search` `github` `task` `db` `browser` `kie` `social` `openclaw` `cron` `memory` `auto` `email` `workflow` `analytics` `claude-code` `device` `elevenlabs` `firecrawl` `rapidapi` `apify` `ssh` `trading` `rag` `whatsapp` `tikvid` `fal-ai` `auto-tool`
 
 ### Memory & Learning — 11 Repositories
 - **PostgreSQL** — Persistent storage for conversations, knowledge, tasks, users, servers
@@ -200,44 +272,80 @@ POST /acp/runs/:id/cancel          — Cancel run
 
 ## Quick Start
 
+### One-Command Install
+
+```bash
+git clone https://github.com/liortesta/ClawdAgent.git
+cd ClawdAgent
+bash install.sh
+```
+
+The interactive installer handles everything: prerequisites check, dependencies, environment configuration, security key generation, and build.
+
 ### Prerequisites
 - Node.js 18+
 - PostgreSQL 15+
 - Redis 7+ (optional — works without it, queues disabled)
-- pnpm 8+
+- pnpm 8+ (auto-installed if missing)
 
-### Setup
+### Manual Setup
 
 ```bash
 # 1. Clone
 git clone https://github.com/liortesta/ClawdAgent.git
-cd clawdagent
+cd ClawdAgent
 
 # 2. Install dependencies
-pnpm install
+pnpm install && cd web && npm install && cd ..
 
 # 3. Configure
 cp .env.example .env
-# Edit .env — at minimum set: ANTHROPIC_API_KEY, DATABASE_URL
+# Edit .env — at minimum set: DATABASE_URL, JWT_SECRET, ENCRYPTION_KEY
 
-# 4. Start database (using Docker)
+# 4. Generate security keys
+JWT_SECRET=$(openssl rand -hex 32)
+ENCRYPTION_KEY=$(openssl rand -hex 32)
+
+# 5. Start database (using Docker)
 docker compose up -d postgres redis
 
-# 5. Run migrations
-pnpm db:migrate
+# 6. Build
+pnpm run build && cd web && npm run build && cd ..
 
-# 6. Start
-pnpm dev
+# 7. Start
+pnpm start
 ```
 
 Open `http://localhost:3000` to see the dashboard.
 
 ### Minimal Setup (just AI chat)
 
-Only need an API key and PostgreSQL:
+Only need a database and one AI provider:
 ```env
-ANTHROPIC_API_KEY=sk-ant-your-key-here
 DATABASE_URL=postgresql://user:pass@localhost:5432/clawdagent
+JWT_SECRET=<generate with: openssl rand -hex 32>
+ENCRYPTION_KEY=<generate with: openssl rand -hex 32>
+
+# Option A: Anthropic API key
+ANTHROPIC_API_KEY=sk-ant-your-key-here
+
+# Option B: OpenRouter (400+ models, many free)
+OPENROUTER_API_KEY=sk-or-v1-your-key-here
+
+# Option C: Claude Code CLI (FREE with Max subscription)
+CLAUDE_CODE_ENABLED=true
+
+# Option D: Ollama (local, free)
+OLLAMA_ENABLED=true
+OLLAMA_URL=http://localhost:11434
+```
+
+### Production with PM2
+
+```bash
+pnpm run build
+pm2 start dist/index.js --name clawdagent --max-memory-restart 8G
+pm2 save
 ```
 
 ### Docker (Full Stack)
@@ -394,15 +502,23 @@ See [`.env.example`](.env.example) for the complete list. Key variables:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `ANTHROPIC_API_KEY` | Yes | Claude API key |
-| `DATABASE_URL` | Yes | PostgreSQL connection |
+| `DATABASE_URL` | **Yes** | PostgreSQL connection string |
+| `JWT_SECRET` | **Yes** | JWT signing key (32+ chars, generate with `openssl rand -hex 32`) |
+| `ENCRYPTION_KEY` | **Yes** | Data encryption key (32+ chars) |
+| `ANTHROPIC_API_KEY` | At least one AI provider | Claude API key |
+| `OPENROUTER_API_KEY` | At least one AI provider | 400+ models including free ones |
+| `CLAUDE_CODE_ENABLED` | At least one AI provider | Use Claude Code CLI (free with Max) |
+| `OLLAMA_ENABLED` | At least one AI provider | Use local Ollama models |
 | `REDIS_URL` | No | Redis (queues disabled without it) |
 | `TELEGRAM_BOT_TOKEN` | No | Telegram bot |
 | `DISCORD_BOT_TOKEN` | No | Discord bot |
-| `OPENROUTER_API_KEY` | No | 400+ models including free ones |
-| `GITHUB_TOKEN` | No | GitHub PRs, issues |
-| `KIE_AI_API_KEY` | No | AI content generation |
+| `WHATSAPP_ENABLED` | No | WhatsApp Web (scan QR from dashboard) |
+| `FAL_AI_API_KEY` | No | AI image/video generation (FLUX, Kling, Wan) |
+| `KIE_AI_API_KEY` | No | AI content generation (60+ models) |
+| `BLOTATO_API_KEY` | No | Social media publishing (9 platforms) |
+| `ELEVENLABS_API_KEY` | No | Text-to-Speech + voice cloning |
 | `BRAVE_API_KEY` | No | Web search |
+| `OPENCLAW_GATEWAY_TOKEN` | No | OpenClaw remote agent bridge |
 
 ---
 
@@ -423,6 +539,20 @@ See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ---
 
+## What's New in v6.1
+
+- **OpenClaw Device Auth** — Ed25519 cryptographic device authentication for secure gateway communication
+- **Claude Code CLI Provider** — Use Claude Code as a free AI backend (requires Max subscription)
+- **fal.ai Integration** — AI image and video generation via FLUX, Stable Diffusion, Kling, Wan
+- **Root Privilege Support** — Automatic detection and safe fallback for root-level deployments
+- **Enhanced Tool Timeouts** — Per-tool timeout configuration for long-running operations
+- **Interactive Installer** — One-command setup with `bash install.sh`
+- **4 AI Provider Modes** — Anthropic direct, OpenRouter (400+ models), Ollama (local), Claude Code CLI
+- **Improved WhatsApp** — Auto-poll verification, better session management
+- **Security Hardening** — Fail-closed governance, message guard, skill scanner, tool integrity checks
+
+---
+
 ## Deployment
 
 ### Docker (Recommended)
@@ -435,19 +565,21 @@ docker compose up -d
 
 ```bash
 # Build
-pnpm build
+pnpm run build
+cd web && npm run build && cd ..
 
 # Start with PM2
-pm2 start dist/index.js --name clawdagent
+pm2 start dist/index.js --name clawdagent --max-memory-restart 8G
 pm2 save
 ```
 
 ### Requirements for Production
 - Set `NODE_ENV=production`
-- Use strong `JWT_SECRET` and `ENCRYPTION_KEY` (32+ characters)
+- Use strong `JWT_SECRET` and `ENCRYPTION_KEY` (generate with `openssl rand -hex 32`)
 - Set up PostgreSQL with proper credentials
 - Configure Redis for full queue support
 - Set `CRON_TIMEZONE` to your timezone
+- Set `BIND_HOST=127.0.0.1` behind a reverse proxy (nginx)
 
 ---
 
@@ -522,7 +654,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 Licensed under the [Apache License 2.0](LICENSE).
 
 ```
-Copyright 2026 Lior Ben Shimon
+Copyright 2024-2026 Lior Ben Shimon (TestaMind)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

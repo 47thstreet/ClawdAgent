@@ -89,6 +89,13 @@ input:focus, button:focus-visible, textarea:focus { outline: none; box-shadow: 0
 [dir="rtl"] .formatted-msg ul,
 [dir="rtl"] .formatted-msg ol { padding-right: 1.25rem; padding-left: 0; }
 
+/* ── Toast slide-in animation ─────────────────────────────────── */
+@keyframes slide-in {
+  0% { opacity: 0; transform: translateX(100%); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-in { animation: slide-in 0.3s ease-out both; }
+
 /* ── Recharts overrides ────────────────────────────────────────── */
 .recharts-cartesian-grid line { stroke: rgba(51, 65, 85, 0.3); }
 .recharts-text { fill: #94a3b8; font-size: 11px; }

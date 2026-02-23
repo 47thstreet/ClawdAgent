@@ -42,6 +42,10 @@ import { OpenClawSync } from './core/openclaw-sync.js';
 import { PluginLoader } from './core/plugin-loader.js';
 import { initKeyRotation, stopKeyRotation } from './security/key-rotation.js';
 // Self-Evolution imports
+import { notificationStore, setNotificationEmitter } from './core/notification-store.js';
+import { LLMEcosystemTracker } from './core/llm-ecosystem-tracker.js';
+import { EcosystemScanner } from './core/ecosystem-scanner.js';
+import { ServiceEcosystemTracker } from './core/service-ecosystem-tracker.js';
 import { SkillFetcher } from './core/skill-fetcher.js';
 import { SkillsEngine } from './core/skills-engine.js';
 import { AgentFactory } from './core/agent-factory.js';
@@ -745,6 +749,74 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
       });
     }
   }
+
+  // ── Self-Evolution: LLM Tracker + Ecosystem Scanner ──
+  await notificationStore.loadFromDisk();
+
+  // Wire WebSocket notification emitter
+  try {
+    const { emitNotification } = await import('./interfaces/web/routes/ws.js');
+    setNotificationEmitter(emitNotification);
+  } catch { /* WS not yet available — notifications will still persist to disk */ }
+
+  // Load settings for evolution preferences
+  let evolutionSettings = { evolutionMode: 'notify', notifyNewModels: true, notifyPriceChanges: false, notifyDeprecations: true, ecosystemScanIntervalHours: 6, skillScanIntervalHours: 24 };
+  try {
+    const { readFileSync, existsSync } = await import('fs');
+    const { join } = await import('path');
+    const settingsPath = join(process.cwd(), 'data', 'settings.json');
+    if (existsSync(settingsPath)) {
+      const s = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+      if (s.evolution) evolutionSettings = { ...evolutionSettings, ...s.evolution };
+    }
+  } catch { /* use defaults */ }
+
+  const llmTracker = new LLMEcosystemTracker({
+    openrouterApiKey: config.OPENROUTER_API_KEY,
+    ...evolutionSettings,
+  });
+  const ecosystemScanner = new EcosystemScanner({
+    evolutionMode: evolutionSettings.evolutionMode,
+  });
+
+  // Service Ecosystem Tracker — monitors Kie.ai, fal.ai, Blotato for new models/features
+  const serviceTracker = new ServiceEcosystemTracker({
+    kieApiKey: (config as any).KIE_AI_API_KEY,
+    falApiKey: (config as any).FAL_AI_API_KEY,
+    blotatoApiKey: (config as any).BLOTATO_API_KEY,
+  });
+
+  // Expose on engine for API routes
+  (engine as any)._llmTracker = llmTracker;
+  (engine as any)._ecosystemScanner = ecosystemScanner;
+  (engine as any)._evolutionEngine = evolutionEngine;
+  (engine as any)._serviceTracker = serviceTracker;
+
+  // Register LLM + ecosystem checks in heartbeat
+  const llmScanMs = (evolutionSettings.ecosystemScanIntervalHours || 6) * 60 * 60_000;
+  const ecoScanMs = 12 * 60 * 60_000;
+  heartbeat.registerCheck('llm-ecosystem', llmScanMs, async () => {
+    try { await llmTracker.scan(); } catch (err: any) { logger.warn('LLM ecosystem scan failed', { error: err.message }); }
+    return [];
+  }, true);
+  heartbeat.registerCheck('ecosystem-scan', ecoScanMs, async () => {
+    try { await ecosystemScanner.discover(); } catch (err: any) { logger.warn('Ecosystem scan failed', { error: err.message }); }
+    return [];
+  }, true);
+  heartbeat.registerCheck('service-ecosystem', 12 * 60 * 60_000, async () => {
+    try { await serviceTracker.scan(); } catch (err: any) { logger.warn('Service ecosystem scan failed', { error: err.message }); }
+    return [];
+  }, true);
+
+  // Flush notifications every 5 minutes (same cadence as memory hierarchy)
+  setInterval(() => { notificationStore.flush().catch(() => {}); }, 5 * 60 * 1000);
+
+  logger.info('🔄 Self-Evolution system initialized', {
+    llmTracker: true,
+    ecosystemScanner: true,
+    evolutionMode: evolutionSettings.evolutionMode,
+    notificationCount: notificationStore.getCount(),
+  });
 
   if (config.HEARTBEAT_ENABLED) {
     heartbeat.start(config.HEARTBEAT_INTERVAL_MS);

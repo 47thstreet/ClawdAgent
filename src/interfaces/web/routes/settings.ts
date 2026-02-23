@@ -29,6 +29,16 @@ interface AppSettings {
     monthlyLimit: number;
     preferFree: boolean;
   };
+  evolution: {
+    evolutionMode: 'auto' | 'notify' | 'disabled';
+    autoUpdateSkills: boolean;
+    autoUpdateModels: boolean;
+    notifyNewModels: boolean;
+    notifyPriceChanges: boolean;
+    notifyDeprecations: boolean;
+    ecosystemScanIntervalHours: number;
+    skillScanIntervalHours: number;
+  };
   providerMode: 'free' | 'cheap' | 'balanced' | 'max';
   language: 'auto' | 'he' | 'en';
 }
@@ -57,6 +67,16 @@ function getDefaultSettings(): AppSettings {
       dailyLimit: parseFloat(process.env.DAILY_BUDGET_LIMIT ?? '5'),
       monthlyLimit: parseFloat(process.env.MONTHLY_BUDGET_LIMIT ?? '100'),
       preferFree: process.env.PREFER_FREE_MODELS === 'true',
+    },
+    evolution: {
+      evolutionMode: 'notify',
+      autoUpdateSkills: true,
+      autoUpdateModels: false,
+      notifyNewModels: true,
+      notifyPriceChanges: false,
+      notifyDeprecations: true,
+      ecosystemScanIntervalHours: 6,
+      skillScanIntervalHours: 24,
     },
     providerMode: (process.env.PROVIDER_MODE as AppSettings['providerMode']) ?? 'balanced',
     language: 'auto',
@@ -109,6 +129,7 @@ function maskSettings(settings: AppSettings) {
       okx_passphrase: { ...settings.exchanges.okx_passphrase, passphrase: maskKey(settings.exchanges.okx_passphrase.passphrase) },
     },
     budget: settings.budget,
+    evolution: settings.evolution,
     providerMode: settings.providerMode,
     language: settings.language,
   };
@@ -173,6 +194,20 @@ export function setupSettingsRoutes(): Router {
       if (typeof updates.budget.dailyLimit === 'number') current.budget.dailyLimit = updates.budget.dailyLimit;
       if (typeof updates.budget.monthlyLimit === 'number') current.budget.monthlyLimit = updates.budget.monthlyLimit;
       if (typeof updates.budget.preferFree === 'boolean') current.budget.preferFree = updates.budget.preferFree;
+    }
+
+    // Merge evolution settings
+    if (updates.evolution) {
+      if (!current.evolution) (current as any).evolution = getDefaultSettings().evolution;
+      const evo = updates.evolution;
+      if (evo.evolutionMode) current.evolution.evolutionMode = evo.evolutionMode;
+      if (typeof evo.autoUpdateSkills === 'boolean') current.evolution.autoUpdateSkills = evo.autoUpdateSkills;
+      if (typeof evo.autoUpdateModels === 'boolean') current.evolution.autoUpdateModels = evo.autoUpdateModels;
+      if (typeof evo.notifyNewModels === 'boolean') current.evolution.notifyNewModels = evo.notifyNewModels;
+      if (typeof evo.notifyPriceChanges === 'boolean') current.evolution.notifyPriceChanges = evo.notifyPriceChanges;
+      if (typeof evo.notifyDeprecations === 'boolean') current.evolution.notifyDeprecations = evo.notifyDeprecations;
+      if (typeof evo.ecosystemScanIntervalHours === 'number') current.evolution.ecosystemScanIntervalHours = evo.ecosystemScanIntervalHours;
+      if (typeof evo.skillScanIntervalHours === 'number') current.evolution.skillScanIntervalHours = evo.skillScanIntervalHours;
     }
 
     if (updates.providerMode) current.providerMode = updates.providerMode;

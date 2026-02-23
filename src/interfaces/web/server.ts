@@ -27,6 +27,7 @@ import { setupTradingRoutes } from './routes/trading-api.js';
 import { setupRAGRoutes } from './routes/rag-api.js';
 import { setupCLIRoutes } from './routes/cli-api.js';
 import { setupOpenClawRoutes } from './routes/openclaw-api.js';
+import { setupEvolutionRoutes } from './routes/evolution-api.js';
 import { setupA2ARoutes, setupACPRoutes, setupAgentCardRoute } from './routes/a2a-api.js';
 import { getAllModels } from '../../core/model-router.js';
 import { resolve as resolvePath } from 'path';
@@ -157,6 +158,12 @@ export class WebServer extends BaseInterface {
     this.app.use('/api/trading', authMiddleware, setupTradingRoutes());
     this.app.use('/api/cli', authMiddleware, setupCLIRoutes(this.engine));
     this.app.use('/api/openclaw', authMiddleware, setupOpenClawRoutes());
+    this.app.use('/api/evolution', authMiddleware, setupEvolutionRoutes({
+      getLLMTracker: () => (this.engine as any)._llmTracker ?? null,
+      getEcosystemScanner: () => (this.engine as any)._ecosystemScanner ?? null,
+      getEvolutionEngine: () => (this.engine as any)._evolutionEngine ?? null,
+      getServiceTracker: () => (this.engine as any)._serviceTracker ?? null,
+    }));
     // RAG routes — lazy proxy so routes work even when RAGEngine is set after server start
     this.app.use('/api/rag', authMiddleware, (req, res, next) => {
       const rag = this.engine.getRAGEngine();
