@@ -152,7 +152,7 @@ export const api = {
 
   // Claude CLI
   cliStatus: () => apiRequest<{ available: boolean; authenticated: boolean; cliPath: string; lastCheckAt: number }>('/cli/status'),
-  cliAuth: () => apiRequest<{ ok: boolean; message: string }>('/cli/auth', { method: 'POST' }),
+  cliAuth: () => apiRequest<{ ok: boolean; authUrl: string | null; message: string }>('/cli/auth', { method: 'POST' }),
   cliRecheck: () => apiRequest<{ available: boolean; authenticated: boolean; cliPath: string; lastCheckAt: number }>('/cli/recheck', { method: 'POST' }),
 
   // WhatsApp

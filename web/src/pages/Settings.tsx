@@ -19,6 +19,7 @@ export default function Settings() {
   const [cliStatus, setCliStatus] = useState<{ available: boolean; authenticated: boolean; cliPath: string; lastCheckAt: number } | null>(null);
   const [cliLoading, setCLILoading] = useState(false);
   const [cliMessage, setCLIMessage] = useState('');
+  const [cliAuthUrl, setCliAuthUrl] = useState<string | null>(null);
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [editKeys, setEditKeys] = useState<Record<string, string>>({});
   const [testing, setTesting] = useState<Record<string, boolean>>({});
@@ -513,25 +514,36 @@ export default function Settings() {
                   onClick={async () => {
                     setCLILoading(true);
                     setCLIMessage('');
+                    setCliAuthUrl(null);
                     try {
                       const result = await api.cliAuth();
                       setCLIMessage(result.message);
-                      // Poll for connection
-                      let attempts = 0;
-                      const poller = setInterval(async () => {
-                        attempts++;
-                        try {
-                          const status = await api.cliRecheck();
-                          setCliStatus(status);
-                          if (status.authenticated || attempts >= 20) {
-                            clearInterval(poller);
-                            setCLILoading(false);
-                            setCLIMessage(status.authenticated ? 'Successfully connected!' : 'Timeout — complete login in browser and click Re-check');
+                      if (result.authUrl) {
+                        setCliAuthUrl(result.authUrl);
+                        // Start polling for successful auth
+                        let attempts = 0;
+                        const poller = setInterval(async () => {
+                          attempts++;
+                          try {
+                            const status = await api.cliRecheck();
+                            setCliStatus(status);
+                            if (status.authenticated) {
+                              clearInterval(poller);
+                              setCLILoading(false);
+                              setCliAuthUrl(null);
+                              setCLIMessage('Successfully connected!');
+                            } else if (attempts >= 60) {
+                              clearInterval(poller);
+                              setCLILoading(false);
+                              setCLIMessage('Timeout — click Authenticate to try again');
+                            }
+                          } catch {
+                            if (attempts >= 60) { clearInterval(poller); setCLILoading(false); }
                           }
-                        } catch {
-                          if (attempts >= 20) { clearInterval(poller); setCLILoading(false); }
-                        }
-                      }, 3000);
+                        }, 3000);
+                      } else {
+                        setCLILoading(false);
+                      }
                     } catch (err: any) {
                       setCLIMessage(err.message);
                       setCLILoading(false);
@@ -541,14 +553,19 @@ export default function Settings() {
                   className="flex items-center gap-2 px-4 py-2 bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 text-sm font-medium"
                 >
                   {cliLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Terminal className="w-4 h-4" />}
-                  {cliLoading ? 'Waiting for browser auth...' : 'Authenticate'}
+                  {cliLoading ? 'Waiting for auth...' : cliStatus?.authenticated ? 'Reconnect' : 'Authenticate'}
                 </button>
                 <button
                   onClick={async () => {
                     try {
                       const status = await api.cliRecheck();
                       setCliStatus(status);
-                      setCLIMessage(status.authenticated ? 'Connected!' : 'Not authenticated yet');
+                      if (status.authenticated) {
+                        setCLIMessage('Connected!');
+                        setCliAuthUrl(null);
+                      } else {
+                        setCLIMessage('Not authenticated yet');
+                      }
                       setTimeout(() => setCLIMessage(''), 3000);
                     } catch {}
                   }}
@@ -558,9 +575,31 @@ export default function Settings() {
                 </button>
               </div>
 
+              {/* Auth URL — clickable link for headless/VPS servers */}
+              {cliAuthUrl && (
+                <div className="mt-4 p-4 bg-dark-900 rounded-lg border border-primary-500/30">
+                  <p className="text-sm text-gray-300 mb-2">Open this link in your browser to sign in:</p>
+                  <a
+                    href={cliAuthUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary-400 hover:text-primary-300 text-sm font-mono break-all underline"
+                  >
+                    {cliAuthUrl.length > 120 ? cliAuthUrl.slice(0, 120) + '...' : cliAuthUrl}
+                  </a>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(cliAuthUrl); setCLIMessage('Link copied!'); setTimeout(() => setCLIMessage(''), 2000); }}
+                    className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-dark-800 border border-gray-700 rounded text-xs hover:bg-dark-700 transition-colors"
+                  >
+                    Copy Link
+                  </button>
+                  <p className="text-xs text-gray-500 mt-3">After signing in, the connection will update automatically. If not, click Re-check.</p>
+                </div>
+              )}
+
               {cliMessage && (
-                <div className={`mt-3 flex items-center gap-2 text-sm ${cliMessage.includes('Success') || cliMessage.includes('Connected') ? 'text-green-400' : 'text-gray-300'}`}>
-                  {cliMessage.includes('Success') || cliMessage.includes('Connected')
+                <div className={`mt-3 flex items-center gap-2 text-sm ${cliMessage.includes('Success') || cliMessage.includes('Connected') || cliMessage.includes('copied') ? 'text-green-400' : 'text-gray-300'}`}>
+                  {cliMessage.includes('Success') || cliMessage.includes('Connected') || cliMessage.includes('copied')
                     ? <CheckCircle className="w-4 h-4" />
                     : <Terminal className="w-4 h-4" />}
                   {cliMessage}
@@ -599,11 +638,12 @@ export default function Settings() {
             <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
               <h3 className="font-medium mb-3">How It Works</h3>
               <ol className="space-y-2 text-sm text-gray-400 list-decimal list-inside">
-                <li>Click <strong className="text-white">Authenticate</strong> — opens Anthropic login in your browser</li>
-                <li>Sign in with your Anthropic account (Max subscription required)</li>
-                <li>The CLI authenticates automatically — no API key needed</li>
+                <li>Click <strong className="text-white">Authenticate</strong> — a sign-in link will appear below</li>
+                <li>Open the link and sign in with your Anthropic account (Max subscription required)</li>
+                <li>The connection updates automatically — or click <strong className="text-white">Re-check</strong></li>
                 <li>All AI requests use your Max subscription at <strong className="text-green-400">zero cost</strong></li>
               </ol>
+              <p className="text-xs text-gray-500 mt-3">To disconnect, click Reconnect — it clears old credentials and generates a fresh link.</p>
             </div>
           </div>
         )}

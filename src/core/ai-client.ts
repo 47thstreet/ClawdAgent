@@ -850,6 +850,7 @@ ${toolList}`;
 
 // ── Free OpenRouter models for 402 (insufficient credits) fallback ───
 const FREE_FALLBACK_MODELS = [
+  'z-ai/glm-4.5-air',                                    // NEW: best free agentic model
   'meta-llama/llama-4-scout:free',                      // 10M context, tools, vision
   'mistralai/devstral-2:free',                           // best free coding/agentic
   'qwen/qwen3-coder:free',                              // 262K context, coding
@@ -1036,6 +1037,12 @@ export class AIClient {
       for (const providerName of providersToTry) {
         const provider = this.providers.get(providerName);
         if (!provider) continue;
+        
+        // Skip provider if it's marked as unavailable (e.g., Claude Code CLI with no tokens)
+        if ('available' in provider && provider.available === false) {
+          logger.debug(`Skipping ${providerName} - marked as unavailable`);
+          continue;
+        }
 
         // Smart model swapping per provider — always use strong models on fallback
         let requestForProvider = sanitizedRequest;
@@ -1083,8 +1090,25 @@ export class AIClient {
             continue; // Skip to next provider
           }
           trackAICall(providerName, requestForProvider.model ?? 'default', 0, 0, 0, false);
+          
+          // Claude Code CLI specific error handling - detect token/auth issues and skip to next provider
+          if (providerName === 'claude-code') {
+            const errorMsg = error?.message?.toLowerCase() || '';
+            if (errorMsg.includes('no tokens') || errorMsg.includes('authentication') || 
+                errorMsg.includes('exited with code 1') || errorMsg.includes('falling back')) {
+              logger.warn('Claude Code CLI unavailable (no tokens/auth), skipping to next provider', { error: error.message });
+              // Mark Claude Code as unavailable temporarily
+              const claudeCodeProvider = this.providers.get('claude-code');
+              if (claudeCodeProvider && 'available' in claudeCodeProvider) {
+                (claudeCodeProvider as any).available = false;
+              }
+              lastError = error;
+              continue; // Skip to next provider immediately
+            }
+          }
+          
           // OpenRouter 402 (insufficient credits) — retry with free models before giving up
-          if (providerName === 'openrouter' && error?.status === 402) {
+          if (providerName === 'openrouter' && (error?.status === 402 || error?.message?.includes('402'))) {
             logger.warn('OpenRouter 402 (insufficient credits) — falling back to free models');
             for (const freeModel of FREE_FALLBACK_MODELS) {
               try {
@@ -1098,7 +1122,12 @@ export class AIClient {
                 logger.warn(`Free model ${freeModel} also failed`, { error: freeError.message });
               }
             }
+            // If all free models failed, continue to next provider
+            logger.warn('All OpenRouter free models failed, trying next provider');
+            lastError = error;
+            continue;
           }
+          
           lastError = error;
           logger.warn(`Provider ${providerName} failed, trying next`, { error: error.message });
         }
@@ -1197,7 +1226,21 @@ export class AIClient {
     };
   }
 
-  getAvailableProviders(): string[] { return Array.from(this.providers.keys()); }
+  getAvailableProviders(): string[] {
+    const available: string[] = [];
+    for (const [name, provider] of this.providers) {
+      // Check if provider has an 'available' flag and it's true
+      if ('available' in provider) {
+        if (provider.available === true) {
+          available.push(name);
+        }
+      } else {
+        // Provider doesn't have availability flag, assume it's available
+        available.push(name);
+      }
+    }
+    return available;
+  }
   getTokensUsed() { return { ...this.totalTokensUsed }; }
 
   /**

@@ -284,6 +284,7 @@ function setupMessageHandler(ws: WebSocket, engine: Engine, user: { userId: stri
           agent: response.agentUsed,
           provider: response.provider,
           model: response.modelUsed,
+          modelDisplay: (response as any).modelDisplay || response.modelUsed, // Human-readable model name
           tokens: response.tokensUsed ? {
             input: response.tokensUsed.input,
             output: response.tokensUsed.output,

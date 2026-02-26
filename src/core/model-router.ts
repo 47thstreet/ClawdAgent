@@ -25,6 +25,13 @@ const STRONG_MODELS: ModelOption[] = [
     supportsTools: true, supportsHebrew: true, supportsVision: true,
   },
   {
+    id: 'anthropic/claude-sonnet-4',
+    provider: 'openrouter', name: 'Claude Sonnet 4',
+    tier: 'mid', costPer1kInput: 0.003, costPer1kOutput: 0.015,
+    maxContext: 1000000, strengths: ['coding', 'reasoning', 'tool-use', 'hebrew', 'planning', 'swe-bench'],
+    supportsTools: true, supportsHebrew: true, supportsVision: true,
+  },
+  {
     id: 'google/gemini-2.5-flash',
     provider: 'openrouter', name: 'Gemini 2.5 Flash',
     tier: 'mid', costPer1kInput: 0.00015, costPer1kOutput: 0.0006,
@@ -71,6 +78,41 @@ const NEW_MODELS: ModelOption[] = [
     supportsTools: true, supportsHebrew: true, supportsVision: true,
   },
   {
+    id: 'qwen/qwen3-coder-next',
+    provider: 'openrouter', name: 'Qwen3 Coder Next (Agentic)',
+    tier: 'cheap', costPer1kInput: 0.00012, costPer1kOutput: 0.00075,
+    maxContext: 262000, strengths: ['coding', 'agentic', 'tool-use', 'long-horizon', 'recovery'],
+    supportsTools: true, supportsHebrew: false, supportsVision: false,
+  },
+  {
+    id: 'google/gemini-2.5-flash-lite-preview-09-2025',
+    provider: 'openrouter', name: 'Gemini 2.5 Flash Lite',
+    tier: 'cheap', costPer1kInput: 0.0001, costPer1kOutput: 0.0004,
+    maxContext: 1050000, strengths: ['fast', 'ultra-low-latency', 'reasoning', 'tool-use', 'vision', 'audio'],
+    supportsTools: true, supportsHebrew: true, supportsVision: true,
+  },
+  {
+    id: 'deepseek/deepseek-v3.1',
+    provider: 'openrouter', name: 'DeepSeek V3.1 (Hybrid Reasoning)',
+    tier: 'cheap', costPer1kInput: 0.00015, costPer1kOutput: 0.00075,
+    maxContext: 128000, strengths: ['reasoning', 'thinking', 'tool-use', 'code-generation', 'agentic'],
+    supportsTools: true, supportsHebrew: false, supportsVision: false,
+  },
+  {
+    id: 'openai/gpt-4.1-mini',
+    provider: 'openrouter', name: 'GPT-4.1 Mini',
+    tier: 'mid', costPer1kInput: 0.0004, costPer1kOutput: 0.0016,
+    maxContext: 1050000, strengths: ['coding', 'vision', 'interactive', 'fast', 'competitive'],
+    supportsTools: true, supportsHebrew: true, supportsVision: true,
+  },
+  {
+    id: 'meta-llama/llama-3.1-8b-instruct',
+    provider: 'openrouter', name: 'Llama 3.1 8B Instruct',
+    tier: 'cheap', costPer1kInput: 0.00002, costPer1kOutput: 0.00005,
+    maxContext: 16000, strengths: ['fast', 'efficient', 'general', 'tool-use'],
+    supportsTools: true, supportsHebrew: true, supportsVision: false,
+  },
+  {
     id: 'mistralai/mistral-large-3',
     provider: 'openrouter', name: 'Mistral Large 3 (675B MoE)',
     tier: 'mid', costPer1kInput: 0.002, costPer1kOutput: 0.006,
@@ -102,6 +144,13 @@ const NEW_MODELS: ModelOption[] = [
 
 // ===== FREE MODELS — Only for sub-agents and helpers =====
 const FREE_MODELS: ModelOption[] = [
+  {
+    id: 'z-ai/glm-4.5-air',
+    provider: 'openrouter', name: 'GLM 4.5 Air (FREE)',
+    tier: 'free', costPer1kInput: 0, costPer1kOutput: 0,
+    maxContext: 131000, strengths: ['agentic', 'tool-use', 'thinking', 'general', 'fast'],
+    supportsTools: true, supportsHebrew: false, supportsVision: false,
+  },
   {
     id: 'meta-llama/llama-4-scout:free',
     provider: 'openrouter', name: 'Llama 4 Scout (10M ctx)',
@@ -199,8 +248,9 @@ export const STRONG_FALLBACK_CHAIN: string[] = [
   'zhipu/glm-5',
 ];
 
-/** Free models for sub-agents only — ordered by capability */
+/** Free models for sub-agents and quick mode — ordered by capability */
 export const SUB_AGENT_MODELS: string[] = [
+  'z-ai/glm-4.5-air',                                    // NEW: best free agentic model
   'meta-llama/llama-4-scout:free',                      // 10M context, tools, vision
   'mistralai/devstral-2:free',                           // best free coding/agentic
   'qwen/qwen3-coder:free',                              // 262K, strong coding
@@ -208,6 +258,16 @@ export const SUB_AGENT_MODELS: string[] = [
   'meta-llama/llama-3.3-70b-instruct:free',              // proven reliable
   'mistralai/mistral-small-3.1-24b-instruct:free',       // fast general
   'deepseek/deepseek-r1-0528:free',                      // reasoning only
+];
+
+/** Cheap models for quick mode when no heavy operations — ordered by cost */
+export const QUICK_MODE_CHEAP_MODELS: string[] = [
+  'meta-llama/llama-3.1-8b-instruct',                    // $0.02/$0.05 — ultra cheap
+  'google/gemini-2.5-flash-lite-preview-09-2025',        // $0.10/$0.40 — fast & cheap
+  'zhipu/glm-4.7-flash',                                 // $0.10/$0.40 — fast
+  'deepseek/deepseek-v3.2',                             // $0.28/$0.41 — cheap
+  'qwen/qwen3-coder-next',                               // $0.12/$0.75 — agentic coding
+  'deepseek/deepseek-v3.1',                             // $0.15/$0.75 — hybrid reasoning
 ];
 
 /**

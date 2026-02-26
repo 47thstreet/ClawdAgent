@@ -88,6 +88,7 @@ export interface OutgoingMessage {
   tokensUsed?: { input: number; output: number };
   provider?: string;
   modelUsed?: string;
+  modelDisplay?: string; // Human-readable model name for display
   skillUsed?: string;
   elapsed?: number;
 }
@@ -417,16 +418,30 @@ export class Engine {
       } else if (resolvedMode === 'local' && config.OLLAMA_ENABLED) {
         selectedProvider = 'ollama';
         selectedModelId = config.OLLAMA_DEFAULT_MODEL;
-      } else if (hasOpenRouter) {
-        // Quick mode: prefer OpenRouter API (fast ~2-3s) over CLI (slow ~10-15s)
-        selectedProvider = 'openrouter';
-        selectedModelId = config.OPENROUTER_DEFAULT_MODEL ?? 'anthropic/claude-sonnet-4.6';
-        incoming.onProgress?.({ type: 'status', message: `⚡ Fast API — ${selectedModelId}` });
+      } else if (resolvedMode === 'max' && claudeCodeActive) {
+        // MAX mode: Claude Code CLI for ALL requests (FREE — Max subscription)
+        selectedProvider = 'claude-code';
+        selectedModelId = undefined;
+        incoming.onProgress?.({ type: 'status', message: '⚡ Claude Code CLI (FREE)' });
       } else if (hasAnthropic) {
         selectedProvider = 'anthropic';
         selectedModelId = 'claude-haiku-4-5-20251001';
         incoming.onProgress?.({ type: 'status', message: '⚡ Fast API — Haiku' });
+      } else if (hasOpenRouter) {
+        // Economy/fallback: use OpenRouter when no better provider available
+        const isSimpleTask = incoming.text.length < 200 && !incoming.text.toLowerCase().includes('code') && !incoming.text.toLowerCase().includes('build');
+        if (isSimpleTask && config.PREFER_FREE_MODELS) {
+          const { QUICK_MODE_CHEAP_MODELS } = await import('./model-router.js');
+          selectedProvider = 'openrouter';
+          selectedModelId = QUICK_MODE_CHEAP_MODELS[0] ?? 'meta-llama/llama-3.1-8b-instruct';
+          incoming.onProgress?.({ type: 'status', message: `⚡ Free/Cheap — ${selectedModelId}` });
+        } else {
+          selectedProvider = 'openrouter';
+          selectedModelId = config.OPENROUTER_DEFAULT_MODEL ?? 'anthropic/claude-sonnet-4.6';
+          incoming.onProgress?.({ type: 'status', message: `⚡ Fast API — ${selectedModelId}` });
+        }
       } else if (claudeCodeActive) {
+        // Fallback to Claude Code CLI if nothing else available
         selectedProvider = 'claude-code';
         selectedModelId = undefined;
       } else {
@@ -498,6 +513,20 @@ export class Engine {
         logger.warn('Social engineering detected in quick response', { agent: agent.id, severity: seCheck.severity, patterns: seCheck.patterns });
       }
 
+      // Format model name for display
+      const modelDisplay = response.modelUsed ?? selectedModelId ?? 'default';
+      const modelName = modelDisplay
+        .replace(/^anthropic\//, '')
+        .replace(/^openai\//, '')
+        .replace(/^meta-llama\//, 'Llama ')
+        .replace(/^google\//, '')
+        .replace(/^qwen\//, 'Qwen ')
+        .replace(/^deepseek\//, 'DeepSeek ')
+        .replace(/^z-ai\//, 'GLM ')
+        .replace(/:free$/, ' (Free)')
+        .split('/')
+        .pop() || modelDisplay;
+
       return {
         text: redactSecrets(response.content),
         format: 'markdown',
@@ -505,6 +534,7 @@ export class Engine {
         tokensUsed: response.usage ? { input: response.usage.inputTokens, output: response.usage.outputTokens } : undefined,
         provider: response.provider,
         modelUsed: response.modelUsed ?? selectedModelId,
+        modelDisplay: modelName, // Human-readable model name
         elapsed: Math.round((Date.now() - startTime) / 1000),
       };
     } catch (error: any) {
@@ -1453,6 +1483,20 @@ If they want to check a running project, use "status" with projectName.`,
         finalText = `⚠️ **Security Warning**: This response contains patterns that may attempt to bypass security controls (severity: ${seResult.severity}).\n\n---\n\n${finalText}`;
       }
 
+      // Format model name for display
+      const modelDisplay = response.modelUsed ?? selectedModelId ?? 'default';
+      const modelName = modelDisplay
+        .replace(/^anthropic\//, '')
+        .replace(/^openai\//, '')
+        .replace(/^meta-llama\//, 'Llama ')
+        .replace(/^google\//, '')
+        .replace(/^qwen\//, 'Qwen ')
+        .replace(/^deepseek\//, 'DeepSeek ')
+        .replace(/^z-ai\//, 'GLM ')
+        .replace(/:free$/, ' (Free)')
+        .split('/')
+        .pop() || modelDisplay;
+
       return {
         text: finalText,
         thinking,
@@ -1461,6 +1505,7 @@ If they want to check a running project, use "status" with projectName.`,
         tokensUsed: response.usage ? { input: response.usage.inputTokens, output: response.usage.outputTokens } : undefined,
         provider: response.provider,
         modelUsed: response.modelUsed ?? selectedModelId,
+        modelDisplay: modelName, // Human-readable model name
         skillUsed: matchedSkill?.id,
         elapsed: Math.round((Date.now() - startTime) / 1000),
       };

@@ -881,6 +881,13 @@ export default function Chat() {
                             {m.provider}
                           </span>
                         )}
+                        {(m as any).modelDisplay && (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                            isGlass ? 'bg-amber-400/10 text-amber-200 border border-amber-400/20' : 'bg-amber-500/15 text-amber-300'
+                          }`} title={`Model: ${(m as any).modelDisplay}`}>
+                            🤖 {(m as any).modelDisplay}
+                          </span>
+                        )}
                       </div>
                     )}
 

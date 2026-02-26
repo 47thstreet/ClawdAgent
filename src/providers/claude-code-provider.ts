@@ -275,13 +275,35 @@ EXAMPLES of what to do:
       if (stderr) logger.debug('Claude Code CLI stderr', { stderr: stderr.slice(0, 300) });
       return this.parseResponse(stdout, model);
     } catch (err: any) {
-      if (err.message.includes('not authenticated') || err.message.includes('login')) {
+      const errorMsg = err.message?.toLowerCase() || '';
+      const stderrMsg = (err.stderr || '').toLowerCase();
+      
+      // Detect authentication/token issues
+      if (errorMsg.includes('not authenticated') || errorMsg.includes('login') || 
+          errorMsg.includes('authentication expired') || errorMsg.includes('token') ||
+          stderrMsg.includes('not authenticated') || stderrMsg.includes('login')) {
         this.authenticated = false;
-        throw new Error('Claude Code CLI: authentication expired. Run "claude login" to re-authenticate.');
+        this.available = false; // Mark as unavailable temporarily
+        throw new Error('Claude Code CLI: authentication expired or no tokens. Falling back to other providers.');
       }
-      if (err.message.includes('TIMEOUT') || err.message.includes('killed')) {
-        throw new Error('Claude Code CLI: request timed out (120s). Retrying may help.');
+      
+      // Detect exit code 1 (usually means no tokens or auth failure)
+      if (errorMsg.includes('exited with code 1') || errorMsg.includes('exited with code') && errorMsg.includes('1')) {
+        this.authenticated = false;
+        this.available = false; // Mark as unavailable temporarily
+        throw new Error('Claude Code CLI: no tokens available or authentication failed. Falling back to other providers.');
       }
+      
+      if (errorMsg.includes('timeout') || errorMsg.includes('killed')) {
+        throw new Error('Claude Code CLI: request timed out (120s). Falling back to other providers.');
+      }
+      
+      // Generic error - mark as unavailable if it's a critical failure
+      if (errorMsg.includes('exited with code') && !errorMsg.includes('0')) {
+        logger.warn('Claude Code CLI failed with non-zero exit code, marking as temporarily unavailable', { error: err.message });
+        this.available = false; // Temporarily mark as unavailable
+      }
+      
       throw new Error(`Claude Code CLI error: ${err.message}`);
     } finally {
       try { unlinkSync(systemFile); } catch {}

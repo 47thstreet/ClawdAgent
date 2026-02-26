@@ -808,6 +808,31 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
     return [];
   }, true);
 
+  // ── Memory Watchdog — prevent OOM crashes ────────────────────────
+  heartbeat.registerCheck('memory-watchdog', 60_000, async () => {
+    const alerts: import('./core/heartbeat.js').HeartbeatAlert[] = [];
+    const mem = process.memoryUsage();
+    const heapMB = Math.round(mem.heapUsed / 1024 / 1024);
+    const rssMB = Math.round(mem.rss / 1024 / 1024);
+
+    // Warning at 600MB heap, critical at 750MB (PM2 restarts at 800MB)
+    if (heapMB > 750) {
+      logger.error('MEMORY CRITICAL — approaching PM2 restart limit', { heapMB, rssMB });
+      // Force garbage collection if available
+      if (global.gc) { global.gc(); logger.info('Forced GC triggered'); }
+      alerts.push({
+        type: 'self_repair', severity: 'critical',
+        title: '🔴 זיכרון קריטי!',
+        message: `Heap: ${heapMB}MB, RSS: ${rssMB}MB — PM2 יעשה restart ב-800MB.\nGC triggered.`,
+        userId: 'admin', platform: 'telegram',
+      });
+    } else if (heapMB > 600) {
+      logger.warn('Memory high', { heapMB, rssMB });
+      if (global.gc) global.gc();
+    }
+    return alerts;
+  });
+
   // Flush notifications every 5 minutes (same cadence as memory hierarchy)
   setInterval(() => { notificationStore.flush().catch(() => {}); }, 5 * 60 * 1000);
 
@@ -968,10 +993,28 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('uncaughtException', (error) => {
     logger.error('Uncaught exception', { error: error.message, stack: error.stack });
+    // Non-fatal errors: WhatsApp/Puppeteer internal errors, network issues — log and continue
+    const msg = error?.message?.toLowerCase() ?? '';
+    const isNonFatal = msg.includes('is not a function') ||
+      msg.includes('cannot read properties') ||
+      msg.includes('protocol error') ||
+      msg.includes('navigation') ||
+      msg.includes('target closed') ||
+      msg.includes('session closed') ||
+      msg.includes('execution context') ||
+      msg.includes('econnreset') ||
+      msg.includes('econnrefused') ||
+      msg.includes('socket hang up') ||
+      msg.includes('epipe');
+    if (isNonFatal) {
+      logger.warn('Non-fatal uncaught exception — continuing', { error: error.message });
+      return; // Don't crash
+    }
     shutdown('uncaughtException');
   });
   process.on('unhandledRejection', (reason) => {
     logger.error('Unhandled rejection', { reason });
+    // Never crash on unhandled rejections — just log
   });
 }
 

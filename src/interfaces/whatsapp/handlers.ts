@@ -73,19 +73,23 @@ export function setupHandlers(client: WAClient, engine: Engine) {
     }
 
     // Text messages
-    const contact = await msg.getContact();
-    const incoming: IncomingMessage = {
-      platform: 'whatsapp',
-      userId: msg.from,
-      userName: contact.pushname ?? contact.name ?? msg.from,
-      chatId: msg.from,
-      text: msg.body,
-    };
+    try {
+      const contact = await msg.getContact().catch(() => null);
+      const incoming: IncomingMessage = {
+        platform: 'whatsapp',
+        userId: msg.from,
+        userName: contact?.pushname ?? contact?.name ?? msg.from,
+        chatId: msg.from,
+        text: msg.body,
+      };
 
-    logger.debug('WhatsApp message', { from: msg.from, text: msg.body.slice(0, 50) });
+      logger.debug('WhatsApp message', { from: msg.from, text: msg.body.slice(0, 50) });
 
-    const response = await engine.process(incoming);
-    const costFooter = formatCostFooter(response.tokensUsed, response.provider, response.modelUsed, response.agentUsed, response.elapsed);
-    await msg.reply(response.text + costFooter);
+      const response = await engine.process(incoming);
+      const costFooter = formatCostFooter(response.tokensUsed, response.provider, response.modelUsed, response.agentUsed, response.elapsed);
+      await msg.reply(response.text + costFooter);
+    } catch (err: any) {
+      logger.error('WhatsApp message handler failed', { from: msg.from, error: err.message });
+    }
   });
 }

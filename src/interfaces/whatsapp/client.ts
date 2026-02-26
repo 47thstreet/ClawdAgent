@@ -9,9 +9,9 @@ import { BaseInterface } from '../base.js';
 import { setupHandlers } from './handlers.js';
 import { setWhatsAppStatus, setLatestQR } from './auth.js';
 
-// Reconnect settings
-const RECONNECT_DELAY_MS = 10_000;
-const MAX_RECONNECT_ATTEMPTS = 5;
+// Reconnect settings — never give up, use exponential backoff with cap
+const RECONNECT_BASE_DELAY_MS = 10_000;
+const RECONNECT_MAX_DELAY_MS = 300_000; // cap at 5 minutes between retries
 
 export class WhatsAppClient extends BaseInterface {
   name = 'WhatsApp';
@@ -26,8 +26,6 @@ export class WhatsAppClient extends BaseInterface {
 
   /** Build a fresh WAClient instance with auth strategy */
   private createClient(): InstanceType<typeof WAClient> {
-    // Use Puppeteer's bundled Chromium — completely isolated from user's Chrome.
-    // Own executable, own user data dir, own profile. No interference with system browser.
     const chromiumPath = puppeteer.executablePath();
     logger.info('WhatsApp using isolated Chromium', { path: chromiumPath });
 
@@ -59,19 +57,18 @@ export class WhatsAppClient extends BaseInterface {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    await this.client.destroy();
+    try { await this.client.destroy(); } catch {}
     setWhatsAppStatus('disconnected');
   }
 
   /** Wire up qr / authenticated / auth_failure / ready / disconnected events */
   private attachLifecycleEvents(client: InstanceType<typeof WAClient>) {
-    // --- QR code received — display in terminal and store for web/Telegram ---
+    // --- QR code received ---
     client.on('qr', (qr: string) => {
       logger.info('WhatsApp QR code received — scan to authenticate');
       setWhatsAppStatus('waiting');
       setLatestQR(qr);
 
-      // Render QR in the terminal so it can be scanned directly
       qrcodeTerminal.generate(qr, { small: true }, (output: string) => {
         console.log('\n========== WhatsApp QR Code ==========');
         console.log(output);
@@ -79,7 +76,7 @@ export class WhatsAppClient extends BaseInterface {
       });
     });
 
-    // --- Successfully authenticated (session restored or QR scanned) ---
+    // --- Successfully authenticated ---
     client.on('authenticated', () => {
       logger.info('WhatsApp client authenticated successfully');
       setWhatsAppStatus('authenticated');
@@ -92,9 +89,11 @@ export class WhatsAppClient extends BaseInterface {
       logger.error('WhatsApp authentication failed', { message });
       setWhatsAppStatus('auth_failure');
       setLatestQR(null);
+      // Auth failure = session expired, try reconnect (will show new QR)
+      this.scheduleReconnect();
     });
 
-    // --- Client is ready to send/receive messages ---
+    // --- Client is ready ---
     client.on('ready', () => {
       logger.info('WhatsApp client ready');
       setWhatsAppStatus('authenticated');
@@ -102,30 +101,36 @@ export class WhatsAppClient extends BaseInterface {
       this.reconnectAttempts = 0;
     });
 
-    // --- Disconnected — attempt auto-reconnect ---
+    // --- Disconnected — auto-reconnect forever ---
     client.on('disconnected', (reason: string) => {
       logger.warn('WhatsApp client disconnected', { reason });
       setWhatsAppStatus('disconnected');
       setLatestQR(null);
       this.scheduleReconnect();
     });
+
+    // --- Catch internal Puppeteer/WhatsApp errors (sendSeen, getContact, etc.) ---
+    client.on('error', (err: Error) => {
+      logger.error('WhatsApp internal error (non-fatal)', { error: err.message });
+    });
   }
 
-  /** Attempt to reconnect after a disconnect */
+  /** Reconnect with exponential backoff — never gives up */
   private scheduleReconnect() {
-    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      logger.error(
-        `WhatsApp reconnect failed after ${MAX_RECONNECT_ATTEMPTS} attempts — giving up. Restart the process to try again.`,
-      );
-      return;
-    }
-
     this.reconnectAttempts++;
-    const delay = RECONNECT_DELAY_MS * this.reconnectAttempts;
-    logger.info(`WhatsApp will reconnect in ${delay / 1000}s (attempt ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+    // Exponential backoff: 10s, 20s, 40s, 80s, 160s, 300s (cap)
+    const delay = Math.min(
+      RECONNECT_BASE_DELAY_MS * Math.pow(2, this.reconnectAttempts - 1),
+      RECONNECT_MAX_DELAY_MS,
+    );
+    logger.info(`WhatsApp will reconnect in ${Math.round(delay / 1000)}s (attempt ${this.reconnectAttempts})`);
+    setWhatsAppStatus('disconnected');
 
     this.reconnectTimer = setTimeout(async () => {
       try {
+        // Destroy old client first to free memory
+        try { await this.client.destroy(); } catch {}
+
         logger.info('WhatsApp reconnecting...');
         this.client = this.createClient();
         this.attachLifecycleEvents(this.client);
