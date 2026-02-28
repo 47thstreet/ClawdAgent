@@ -4,7 +4,7 @@
 
 ### The Autonomous AI Octopus
 
-**v6.1 — 45,000+ lines of TypeScript. 57 core modules. 18 agents. 29 tools. 90 skills. 5 platforms. 3 protocols. 1 brain.**
+**v6.2 — 47,000+ lines of TypeScript. 60 core modules. 18 agents. 29 tools. 90 skills. 5 platforms. 3 protocols. 1 brain.**
 
 An open-source autonomous AI agent that thinks, learns, evolves, and never stops.
 
@@ -22,7 +22,7 @@ An open-source autonomous AI agent that thinks, learns, evolves, and never stops
 
 ## What is ClawdAgent?
 
-ClawdAgent is the **most comprehensive autonomous AI agent system** ever built as open-source. It runs 24/7 across multiple platforms, with **14-layer security**, **9 intelligence subsystems**, **18 specialized agents**, **29 tools**, and **90 skills** — all connected through a unified brain.
+ClawdAgent is the **most comprehensive autonomous AI agent system** ever built as open-source. It runs 24/7 across multiple platforms, with **14-layer security**, **9 intelligence subsystems**, **18 specialized agents**, **29 tools**, and **90 skills** — all connected through a unified brain. It can **autonomously manage Facebook accounts**, **browse the web visually** with VNC streaming, and **publish to 9 social platforms** on a daily schedule with AI-generated content.
 
 It doesn't just respond to commands — it **thinks proactively**, **learns from interactions**, **evolves its own capabilities**, **secures itself against attacks**, and **manages complex multi-step workflows** autonomously.
 
@@ -92,9 +92,9 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 | Metric | Count |
 |--------|-------|
-| Lines of TypeScript | **45,000+** |
-| TypeScript Files | **282** |
-| Core Modules | **57** |
+| Lines of TypeScript | **47,000+** |
+| TypeScript Files | **328** |
+| Core Modules | **60** |
 | Specialized Agents | **18** (+ 17 dev agents) |
 | Integrated Tools | **29** + Dynamic Tool Creator |
 | Pre-loaded Skills | **90** across 23 categories |
@@ -311,7 +311,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 | Metric | OpenClaw | **ClawdAgent** |
 |--------|----------|----------------|
 | License | MIT | **Apache 2.0 (patent + trademark protection)** |
-| Age | ~2 months | **6 months (v6.1)** |
+| Age | ~2 months | **6 months (v6.2)** |
 | Codebase | ~10K lines | **45,000+ lines TypeScript (282 files)** |
 | Modules | ~20 | **57 core modules** |
 | Protocol Support | MCP (partial) | **MCP + A2A + ACP (full compliance)** |
@@ -762,16 +762,39 @@ See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ---
 
-## What's New in v6.1
+## What's New in v6.2
 
+### Browser Automation & VNC Streaming
+- **Visual Browser Sessions** — Playwright-powered browser with Xvfb + x11vnc + noVNC. Watch your agent browse the web in real-time from the dashboard
+- **Stealth Engine** — Anti-detection fingerprinting for browser automation (WebGL, Canvas, Navigator, WebRTC spoofing)
+- **Browser Session Manager** — Multi-session orchestration with automatic process cleanup and orphan killing
+- **Browser View Page** — Full VNC streaming in the web dashboard with command panel, quick actions, and AI instruction input
+
+### Autonomous Facebook Agent
+- **Facebook Account Manager** — Import cookies, manage multiple accounts, verify login sessions
+- **Autonomous Facebook Agent** — Fully autonomous posting, commenting, friend requests, group interactions with human-like behavior
+- **Safety Controls** — Rate limiting, active hours scheduling, error-based auto-pause, configurable daily limits per action type
+- **Facebook Tool** — 11 chat actions: list accounts, start/stop/pause agent, view logs, open Facebook in VNC, post content, navigate
+- **Cookie-Based Auth** — Import Facebook cookies for seamless logged-in sessions without username/password
+
+### Cron & Scheduled Publishing
+- **AI-Powered Cron Publishing** — `ai_publish` handler generates content with AI and publishes to social media on schedule
+- **Push Notifications** — Bell icon notifications when scheduled automations publish content (green success badge)
+- **Manual Trigger API** — `POST /api/cron/:id/trigger` to test cron jobs on demand from the dashboard
+- **Dead Letter Queue** — Failed cron tasks retry with exponential backoff (5s → 30s → 2min), then move to DLQ for manual review
+
+### Chat & Routing Improvements
+- **Facebook Intent Router** — 10 keyword patterns (Hebrew + English) route Facebook requests to web-agent automatically
+- **Browser Session Badges** — Chat shows clickable "Watch in Browser View" links when agents open browser sessions
+- **3 New Browser Skills** — `browser-signup`, `browser-scrape`, `browser-form` for common automation patterns
+- **System Graph** — Browser infrastructure nodes (Session Manager, Xvfb, VNC, Stealth Engine) visible in architecture graph
+
+### Previous (v6.1)
 - **OpenClaw Device Auth** — Ed25519 cryptographic device authentication for secure gateway communication
 - **Claude Code CLI Provider** — Use Claude Code as a free AI backend (requires Max subscription)
 - **fal.ai Integration** — AI image and video generation via FLUX, Stable Diffusion, Kling, Wan
-- **Root Privilege Support** — Automatic detection and safe fallback for root-level deployments
-- **Enhanced Tool Timeouts** — Per-tool timeout configuration for long-running operations
 - **Interactive Installer** — One-command setup with `bash install.sh`
 - **4 AI Provider Modes** — Anthropic direct, OpenRouter (400+ models), Ollama (local), Claude Code CLI
-- **Improved WhatsApp** — Auto-poll verification, better session management
 - **Security Hardening** — Fail-closed governance, message guard, skill scanner, tool integrity checks
 
 ---
@@ -791,7 +814,8 @@ ClawdAgent isn't a toy — it's a production system. Here's what people use it f
 | **Server Fleet Management** | Monitor multiple servers, auto-fix common issues, Docker management, health dashboards |
 | **Content Pipeline** | Generate scripts → create videos → make thumbnails → publish everywhere → track performance |
 | **Mobile Automation** | Control Android apps, automate workflows, handle SMS/calls, manage notifications |
-| **Browser Automation** | Fill forms, scrape data, take screenshots, navigate workflows — headless on servers |
+| **Browser Automation** | Fill forms, scrape data, take screenshots, navigate workflows — with VNC streaming so you watch in real-time |
+| **Facebook Automation** | Autonomous agent posts, comments, sends friend requests, joins groups — all with human-like delays and safety limits |
 | **Business Intelligence** | Cost tracking, ROI analysis, budget forecasting, agent performance metrics |
 | **Team Coordination** | Multi-agent crews collaborate on complex tasks, with governance and approval gates |
 
@@ -845,7 +869,7 @@ pm2 save
 | **Database** | PostgreSQL 15+, Drizzle ORM |
 | **Cache/Queue** | Redis 7+, BullMQ |
 | **Web** | Express 5, React, Vite, Tailwind CSS |
-| **Automation** | Playwright, ADB/Appium |
+| **Automation** | Playwright (stealth mode), Xvfb + VNC, ADB/Appium |
 | **Communication** | grammy (Telegram), discord.js, whatsapp-web.js |
 | **Security** | Helmet, bcrypt, JWT, Zod validation |
 | **DevOps** | Docker, PM2, GitHub Actions |
@@ -926,6 +950,8 @@ Apache 2.0 protects both users and contributors with explicit patent grants and 
 
 **Built with Claude by [Lior Testa - TestaMind](https://github.com/liortesta)**
 
-If this project helps you, please give it a star!
+If ClawdAgent helps you, please **give it a star** and mention it in your projects!
+
+[![Star on GitHub](https://img.shields.io/github/stars/liortesta/ClawdAgent?style=social)](https://github.com/liortesta/ClawdAgent)
 
 </div>

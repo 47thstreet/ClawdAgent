@@ -36,6 +36,7 @@ const GROUP_COLORS: Record<string, string> = {
   evolution: '#ec4899',
   provider: '#06b6d4',
   model: '#8b5cf6',
+  browser: '#14b8a6',
 };
 
 const GROUP_LABELS: Record<string, string> = {
@@ -47,6 +48,7 @@ const GROUP_LABELS: Record<string, string> = {
   evolution: 'Evolution',
   provider: 'Providers',
   model: 'Models',
+  browser: 'Browser',
 };
 
 // Stable hash per node ID → unique animation phase (0-1)
@@ -123,7 +125,7 @@ export default function Graph() {
   const [selected, setSelected] = useState<GraphNode | null>(null);
   const [popup, setPopup] = useState<GraphNode | null>(null);
   const [activeFilters, setActiveFilters] = useState<Set<string>>(
-    new Set(['core', 'agent', 'tool', 'intelligence', 'skill', 'evolution', 'provider', 'model']),
+    new Set(['core', 'agent', 'tool', 'intelligence', 'skill', 'evolution', 'provider', 'model', 'browser']),
   );
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement | null>(null);

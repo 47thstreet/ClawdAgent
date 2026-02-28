@@ -1,5 +1,6 @@
 import { BaseTool, ToolResult } from './base-tool.js';
-import config from '../../config.js';
+import { BrowserSessionManager } from '../../actions/browser/session-manager.js';
+import logger from '../../utils/logger.js';
 
 /** Block SSRF — deny navigation to internal/private networks and dangerous protocols */
 function isUrlSafe(rawUrl: string): { safe: boolean; reason?: string } {
@@ -35,25 +36,37 @@ function isUrlSafe(rawUrl: string): { safe: boolean; reason?: string } {
   }
 }
 
-let playwright: any = null;
-
-async function getPlaywright() {
-  if (playwright) return playwright;
-  try {
-    playwright = await import('playwright');
-    return playwright;
-  } catch {
-    return null;
-  }
-}
-
+/**
+ * BrowserTool — uses BrowserSessionManager for all browser operations.
+ * Sessions created here are visible in the Browser View page.
+ * Users can attach VNC to watch the agent work in real time.
+ */
 export class BrowserTool extends BaseTool {
   name = 'browser';
   description = 'Web browser automation. Actions: navigate(url), click(selector), type(selector,text), fill_form(fields), screenshot(), extract(selector), get_links(), scroll(direction), wait(selector), evaluate(js), close(). Use for: signing up for websites, filling forms, scraping data, web interactions.';
 
-  private browser: any = null;
-  private context: any = null;
-  private page: any = null;
+  private sessionId: string | null = null;
+
+  /** Get the current session ID (for external use, e.g. chat UI badge) */
+  getSessionId(): string | null { return this.sessionId; }
+
+  private async ensureSession(): Promise<{ page: any; sessionId: string }> {
+    const mgr = BrowserSessionManager.getInstance();
+
+    // If we have a session, check it's still alive
+    if (this.sessionId) {
+      const page = mgr.getPage(this.sessionId);
+      if (page) return { page, sessionId: this.sessionId };
+      // Session died — clear and recreate
+      this.sessionId = null;
+    }
+
+    // Create a headless session (no VNC by default — user can attach from Browser View)
+    const session = await mgr.createSession(undefined, false);
+    this.sessionId = session.id;
+    logger.info('BrowserTool created session via SessionManager', { sessionId: session.id });
+    return { page: mgr.getPage(session.id)!, sessionId: session.id };
+  }
 
   async execute(input: Record<string, unknown>): Promise<ToolResult> {
     const action = input.action as string;
@@ -65,52 +78,31 @@ export class BrowserTool extends BaseTool {
     const direction = input.direction as string | undefined;
 
     try {
-      const pw = await getPlaywright();
-      if (!pw) {
-        return { success: false, output: '', error: 'Playwright not installed. Run: pnpm add playwright && npx playwright install chromium' };
-      }
-
-      // Initialize browser if needed
-      if (!this.browser) {
-        this.browser = await pw.chromium.launch({
-          headless: true,
-          args: ['--no-sandbox', '--disable-dev-shm-usage'],
-        });
-        this.context = await this.browser.newContext({
-          viewport: { width: 1280, height: 720 },
-          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          locale: config.BROWSER_LOCALE ?? 'en-US',
-          timezoneId: config.CRON_TIMEZONE ?? 'UTC',
-        });
-        this.page = await this.context.newPage();
-        this.log('Browser launched');
-      }
-
-      if (!this.page) return { success: false, output: '', error: 'Browser page not initialized' };
+      const { page, sessionId } = await this.ensureSession();
 
       switch (action) {
         case 'navigate': {
           if (!url) return { success: false, output: '', error: 'URL required' };
           const urlCheck = isUrlSafe(url);
           if (!urlCheck.safe) return { success: false, output: '', error: `SSRF blocked: ${urlCheck.reason}` };
-          await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-          const title = await this.page.title();
-          const bodyText = await this.page.innerText('body').catch(() => '');
+          await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+          const title = await page.title();
+          const bodyText = await page.innerText('body').catch(() => '');
           const truncated = bodyText.slice(0, 3000);
           this.log('Navigated', { url, title });
-          return { success: true, output: `Page: ${title}\nURL: ${this.page.url()}\n\n${truncated}` };
+          return { success: true, output: `[session:${sessionId}] Page: ${title}\nURL: ${page.url()}\n\n${truncated}` };
         }
 
         case 'click': {
           if (!selector) return { success: false, output: '', error: 'Selector required' };
-          await this.page.click(selector, { timeout: 10000 });
-          await this.page.waitForTimeout(1000);
-          return { success: true, output: `Clicked: ${selector}\nCurrent URL: ${this.page.url()}` };
+          await page.click(selector, { timeout: 10000 });
+          await page.waitForTimeout(1000);
+          return { success: true, output: `Clicked: ${selector}\nCurrent URL: ${page.url()}` };
         }
 
         case 'type': {
           if (!selector || !text) return { success: false, output: '', error: 'Selector and text required' };
-          await this.page.fill(selector, text);
+          await page.fill(selector, text);
           return { success: true, output: `Typed "${text}" into ${selector}` };
         }
 
@@ -119,7 +111,7 @@ export class BrowserTool extends BaseTool {
           const results: string[] = [];
           for (const [sel, value] of Object.entries(fields)) {
             try {
-              await this.page.fill(sel, value);
+              await page.fill(sel, value);
               results.push(`OK ${sel}: "${value}"`);
             } catch (err: any) {
               results.push(`FAIL ${sel}: ${err.message}`);
@@ -129,25 +121,26 @@ export class BrowserTool extends BaseTool {
         }
 
         case 'screenshot': {
-          const screenshot = await this.page.screenshot({ type: 'png', fullPage: false });
+          const mgr = BrowserSessionManager.getInstance();
+          const screenshot = await mgr.screenshot(sessionId);
           const fs = await import('fs/promises');
           const path = await import('path');
           const tmpDir = process.env.TEMP ?? '/tmp';
           const filePath = path.join(tmpDir, `screenshot_${Date.now()}.png`);
           await fs.writeFile(filePath, screenshot);
           this.log('Screenshot saved', { path: filePath });
-          return { success: true, output: `Screenshot saved: ${filePath}\nPage: ${await this.page.title()}\nURL: ${this.page.url()}` };
+          return { success: true, output: `Screenshot saved: ${filePath}\nPage: ${await page.title()}\nURL: ${page.url()}` };
         }
 
         case 'extract': {
           if (!selector) return { success: false, output: '', error: 'Selector required' };
-          const elements = await this.page.$$(selector);
+          const elements = await page.$$(selector);
           const texts = await Promise.all(elements.map((el: any) => el.innerText()));
           return { success: true, output: texts.join('\n') };
         }
 
         case 'get_links': {
-          const links = await this.page.$$eval('a[href]', (els: any[]) =>
+          const links = await page.$$eval('a[href]', (els: any[]) =>
             els.map(el => ({ text: el.textContent?.trim(), href: el.getAttribute('href') }))
               .filter((l: any) => l.href && !l.href.startsWith('#'))
               .slice(0, 50)
@@ -157,19 +150,19 @@ export class BrowserTool extends BaseTool {
 
         case 'scroll': {
           const dir = direction === 'up' ? -500 : 500;
-          await this.page.evaluate(`window.scrollBy(0, ${dir})`);
+          await page.evaluate(`window.scrollBy(0, ${dir})`);
           return { success: true, output: `Scrolled ${direction ?? 'down'}` };
         }
 
         case 'wait': {
           if (!selector) return { success: false, output: '', error: 'Selector required' };
-          await this.page.waitForSelector(selector, { timeout: 15000 });
+          await page.waitForSelector(selector, { timeout: 15000 });
           return { success: true, output: `Element found: ${selector}` };
         }
 
         case 'evaluate': {
           if (!js) return { success: false, output: '', error: 'JavaScript required' };
-          const result = await this.page.evaluate(js);
+          const result = await page.evaluate(js);
           return { success: true, output: `Result: ${JSON.stringify(result)}` };
         }
 
@@ -188,8 +181,11 @@ export class BrowserTool extends BaseTool {
   }
 
   async cleanup() {
-    if (this.page) { await this.page.close().catch(() => {}); this.page = null; }
-    if (this.context) { await this.context.close().catch(() => {}); this.context = null; }
-    if (this.browser) { await this.browser.close().catch(() => {}); this.browser = null; }
+    if (this.sessionId) {
+      try {
+        await BrowserSessionManager.getInstance().closeSession(this.sessionId);
+      } catch { /* session may already be closed */ }
+      this.sessionId = null;
+    }
   }
 }

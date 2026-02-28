@@ -29,10 +29,16 @@ import { setupCLIRoutes } from './routes/cli-api.js';
 import { setupOpenClawRoutes } from './routes/openclaw-api.js';
 import { setupEvolutionRoutes } from './routes/evolution-api.js';
 import { setupA2ARoutes, setupACPRoutes, setupAgentCardRoute } from './routes/a2a-api.js';
+import { setupBrowserRoutes } from './routes/browser-api.js';
+import { setupFacebookRoutes } from './routes/facebook-api.js';
+import { setupFacebookAgentRoutes } from './routes/facebook-agent-api.js';
+import { BrowserSessionManager } from '../../actions/browser/session-manager.js';
 import { getAllModels } from '../../core/model-router.js';
 import { resolve as resolvePath } from 'path';
 import { metricsMiddleware, renderMetrics } from '../../core/metrics.js';
 import { getAllCircuitBreakerStats } from '../../core/circuit-breaker.js';
+import { IncomingMessage } from 'http';
+import { Socket, connect as netConnect } from 'net';
 
 export class WebServer extends BaseInterface {
   name = 'Web';
@@ -44,11 +50,69 @@ export class WebServer extends BaseInterface {
     super(engine);
     this.app = express();
     this.server = createServer(this.app);
-    this.wss = new WebSocketServer({ server: this.server });
+    this.wss = new WebSocketServer({ noServer: true });
+
+    // Kill orphaned browser processes from previous runs
+    BrowserSessionManager.cleanupOrphans();
 
     this.setupMiddleware();
     this.setupRoutes();
     setupWebSocket(this.wss, this.engine);
+    this.setupUpgradeRouter();
+  }
+
+  /** Route WebSocket upgrade requests — VNC proxy vs regular WS (chat/notifications) */
+  private setupUpgradeRouter() {
+    this.server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
+      const url = req.url ?? '';
+
+      // VNC proxy: /browser-vnc/<sessionId>
+      const vncMatch = url.match(/^\/browser-vnc\/([a-f0-9-]+)/);
+      if (vncMatch) {
+        this.handleVncUpgrade(vncMatch[1], req, socket, head);
+        return;
+      }
+
+      // All other paths → regular WebSocket (chat, notifications)
+      this.wss.handleUpgrade(req, socket, head, (ws) => {
+        this.wss.emit('connection', ws, req);
+      });
+    });
+  }
+
+  /** Proxy a VNC WebSocket connection to the session's websockify port */
+  private handleVncUpgrade(sessionId: string, req: IncomingMessage, socket: Socket, head: Buffer) {
+    const mgr = BrowserSessionManager.getInstance();
+    const session = mgr.getSession(sessionId);
+
+    if (!session || session.status !== 'running') {
+      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+
+    const url = req.url ?? '';
+
+    // Raw TCP proxy to the session's websockify port on localhost
+    const target = netConnect({ host: '127.0.0.1', port: session.wsPort }, () => {
+      // Forward the original HTTP upgrade request
+      target.write(`GET ${url} HTTP/1.1\r\n`);
+      const headers = req.rawHeaders;
+      for (let i = 0; i < headers.length; i += 2) {
+        target.write(`${headers[i]}: ${headers[i + 1]}\r\n`);
+      }
+      target.write('\r\n');
+      if (head.length > 0) target.write(head);
+
+      // Bi-directional pipe
+      socket.pipe(target);
+      target.pipe(socket);
+    });
+
+    target.on('error', () => { socket.destroy(); });
+    socket.on('error', () => { target.destroy(); });
+    socket.on('close', () => { target.destroy(); });
+    target.on('close', () => { socket.destroy(); });
   }
 
   private setupMiddleware() {
@@ -56,13 +120,14 @@ export class WebServer extends BaseInterface {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          scriptSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-eval'"],  // unsafe-eval needed for noVNC
           styleSrc: ["'self'", "'unsafe-inline'"],  // unsafe-inline kept for styles only (dynamic CSS-in-JS)
           imgSrc: ["'self'", 'data:', 'blob:'],
           connectSrc: ["'self'", 'ws:', 'wss:'],
           fontSrc: ["'self'"],
           objectSrc: ["'none'"],
-          frameAncestors: ["'none'"],
+          frameSrc: ["'self'"],          // Allow noVNC iframes
+          frameAncestors: ["'self'"],    // Allow embedding in our own pages (noVNC iframe)
         },
       },
       crossOriginEmbedderPolicy: false,
@@ -172,6 +237,14 @@ export class WebServer extends BaseInterface {
       (this as any)._ragRouter(req, res, next);
     });
 
+    // ── Browser View routes ─────────────────────────────────────────────────
+    this.app.use('/api/browser', authMiddleware, setupBrowserRoutes(this.engine));
+    // ── Facebook Account routes ──────────────────────────────────────────────
+    this.app.use('/api/facebook', authMiddleware, setupFacebookRoutes());
+    this.app.use('/api/facebook-agent', authMiddleware, setupFacebookAgentRoutes());
+    // Serve noVNC static files (HTML5 VNC client)
+    this.app.use('/novnc', express.static('/usr/share/novnc'));
+
     // ── Protocol Endpoints (A2A + ACP) ─────────────────────────────────────
     // Agent Card — public (no auth), per A2A spec: GET /.well-known/agent.json
     this.app.use('/.well-known', setupAgentCardRoute(this.engine));
@@ -253,6 +326,8 @@ export class WebServer extends BaseInterface {
   }
 
   async stop() {
+    // Cleanup headed browser sessions (kills Xvfb, VNC, websockify, Playwright)
+    await BrowserSessionManager.getInstance().closeAll().catch(() => {});
     this.wss.close();
     return new Promise<void>((resolve) => { this.server.close(() => resolve()); });
   }

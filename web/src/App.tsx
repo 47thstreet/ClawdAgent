@@ -19,6 +19,7 @@ import Intelligence from './pages/Intelligence';
 import Graph from './pages/Graph';
 import OpenClaw from './pages/OpenClaw';
 import Evolution from './pages/Evolution';
+import BrowserView from './pages/BrowserView';
 import ToastContainer, { pushToast } from './components/shared/ToastContainer';
 import { useAuthStore } from './stores/auth';
 import { useNotificationsStore } from './stores/notifications';
@@ -100,6 +101,7 @@ export default function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="tasks" element={<Tasks />} />
           <Route path="skills" element={<Skills />} />
+          <Route path="browser" element={<BrowserView />} />
           <Route path="servers" element={<Servers />} />
           <Route path="agents" element={<Agents />} />
           <Route path="cron" element={<Cron />} />

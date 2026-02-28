@@ -8,6 +8,9 @@ export interface Message {
   thinking?: string;
   agent?: string;
   provider?: string;
+  model?: string;
+  tokens?: { input: number; output: number; total: number };
+  elapsed?: number;
   timestamp: Date;
 }
 

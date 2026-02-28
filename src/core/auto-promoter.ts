@@ -13,6 +13,7 @@
 import { SocialTool } from '../agents/tools/social-tool.js';
 import { OpenClawTool } from '../agents/tools/openclaw-tool.js';
 import { TikVidTool } from '../agents/tools/tikvid-tool.js';
+import { notificationStore } from './notification-store.js';
 import config from '../config.js';
 import logger from '../utils/logger.js';
 
@@ -291,7 +292,19 @@ export function getPromotionStats(): PromotionState & { nextTemplate: string } {
  */
 export function registerPromoterCron(cronEngine: { registerAction: (name: string, handler: (task: any) => Promise<string>) => void }): void {
   cronEngine.registerAction('auto_promote', async () => {
-    return runPromotionCycle();
+    const result = await runPromotionCycle();
+
+    // Push notification to bell icon
+    notificationStore.push({
+      type: 'cron_publish',
+      title: 'Auto-Promote Published',
+      body: result.slice(0, 300),
+      severity: 'success',
+      source: 'system',
+    });
+    notificationStore.flush().catch(() => {});
+
+    return result;
   });
 
   logger.info('Auto-promoter cron action registered');

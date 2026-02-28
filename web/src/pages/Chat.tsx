@@ -8,6 +8,7 @@ import {
   Brain, ChevronDown, ChevronUp, Plus, PanelLeftClose, PanelLeft, MoreVertical,
   Paperclip, FileText, Image as ImageIcon, File as FileIcon,
   Languages, Sparkles, Palette, Cpu, Wrench, Zap, QrCode, Shield, GitBranch, Cog,
+  Monitor,
 } from 'lucide-react';
 
 const RESPONSE_MODES = [
@@ -16,30 +17,50 @@ const RESPONSE_MODES = [
   { id: 'deep' as const, label: 'מעמיק', labelEn: 'Deep', icon: Brain, color: 'text-purple-400', desc: 'ניתוח מלא' },
 ];
 
-/** Render message content — detects inline images (data URLs, markdown images) */
+/** Render message content — detects inline images and browser session markers */
 function renderMessageContent(content: string) {
+  // Strip [session:UUID] markers and track if browser session is active
+  const sessionMatch = content.match(/\[session:([a-f0-9-]+)\]/);
+  const cleanContent = content.replace(/\[session:[a-f0-9-]+\]\s*/g, '');
+
   // Match [QR_IMAGE:data:...] or ![alt](data:image/...) or bare data:image/... URLs
   const imagePattern = /\[QR_IMAGE:(data:image\/[^\]]+)\]|!\[[^\]]*\]\((data:image\/[^)]+)\)|(data:image\/\S+)/g;
   const parts: Array<{ type: 'text' | 'image'; value: string }> = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
-  while ((match = imagePattern.exec(content)) !== null) {
+  while ((match = imagePattern.exec(cleanContent)) !== null) {
     if (match.index > lastIndex) {
-      parts.push({ type: 'text', value: content.slice(lastIndex, match.index) });
+      parts.push({ type: 'text', value: cleanContent.slice(lastIndex, match.index) });
     }
     const dataUrl = match[1] || match[2] || match[3];
     parts.push({ type: 'image', value: dataUrl });
     lastIndex = match.index + match[0].length;
   }
 
-  if (lastIndex < content.length) {
-    parts.push({ type: 'text', value: content.slice(lastIndex) });
+  if (lastIndex < cleanContent.length) {
+    parts.push({ type: 'text', value: cleanContent.slice(lastIndex) });
   }
 
-  // No images found — return plain text
+  // Browser session badge
+  const sessionBadge = sessionMatch ? (
+    <a
+      href="/browser"
+      className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 bg-teal-600/20 hover:bg-teal-600/30 text-teal-400 text-xs font-medium rounded-lg border border-teal-500/30 transition-colors"
+    >
+      <Monitor className="w-3.5 h-3.5" />
+      Watch in Browser View
+    </a>
+  ) : null;
+
+  // No images found — return plain text + badge
   if (parts.length === 1 && parts[0].type === 'text') {
-    return <p className="whitespace-pre-wrap text-sm leading-relaxed break-words">{content}</p>;
+    return (
+      <div>
+        <p className="whitespace-pre-wrap text-sm leading-relaxed break-words">{cleanContent}</p>
+        {sessionBadge}
+      </div>
+    );
   }
 
   return (
@@ -56,6 +77,7 @@ function renderMessageContent(content: string) {
           <span key={i} className="whitespace-pre-wrap">{part.value}</span>
         )
       )}
+      {sessionBadge}
     </div>
   );
 }
@@ -278,7 +300,7 @@ export default function Chat() {
       if (connected) setWsError(null);
     });
 
-    ws.on('message', (data: { text: string; thinking?: string; agent?: string; tokens?: number; provider?: string; elapsed?: number; conversationId?: string }) => {
+    ws.on('message', (data: { text: string; thinking?: string; agent?: string; tokens?: { input: number; output: number; total: number }; provider?: string; model?: string; elapsed?: number; conversationId?: string }) => {
       // Use conversationId from response (for recovered messages) or from pending ref
       const targetConv = data.conversationId || pendingConvRef.current;
       pendingConvRef.current = null;
@@ -291,6 +313,9 @@ export default function Chat() {
           thinking: data.thinking,
           agent: data.agent,
           provider: data.provider,
+          model: data.model,
+          tokens: data.tokens,
+          elapsed: data.elapsed,
         });
       }
       setConversationLoading(null);
@@ -431,7 +456,7 @@ export default function Chat() {
     if (file) {
       try {
         const res = await api.chatWithFile(text, file, convId, responseMode === 'auto' ? undefined : responseMode, selectedModel === 'auto' ? undefined : selectedModel);
-        addMessageTo(convId, { role: 'assistant', content: res.message, thinking: res.thinking, agent: res.agent, provider: res.provider });
+        addMessageTo(convId, { role: 'assistant', content: res.message, thinking: res.thinking, agent: res.agent, provider: res.provider, model: res.model, tokens: res.tokens ? { ...res.tokens, total: res.tokens.input + res.tokens.output } : undefined, elapsed: res.elapsed });
       } catch (err: any) {
         addMessageTo(convId, { role: 'assistant', content: `Error: ${err.message}` });
       }
@@ -453,7 +478,7 @@ export default function Chat() {
     // REST API fallback
     try {
       const res = await api.chat(text, convId, responseMode === 'auto' ? undefined : responseMode, selectedModel === 'auto' ? undefined : selectedModel);
-      addMessageTo(convId, { role: 'assistant', content: res.message, thinking: res.thinking, agent: res.agent, provider: res.provider });
+      addMessageTo(convId, { role: 'assistant', content: res.message, thinking: res.thinking, agent: res.agent, provider: res.provider, model: res.model, tokens: res.tokens ? { ...res.tokens, total: res.tokens.input + res.tokens.output } : undefined, elapsed: res.elapsed });
     } catch (err: any) {
       addMessageTo(convId, { role: 'assistant', content: `Error: ${err.message}` });
     }
@@ -926,6 +951,41 @@ export default function Chat() {
                       ? renderFormattedContent(m.content)
                       : renderMessageContent(m.content)
                     }
+
+                    {/* Metadata footer — cost, tokens, model, time */}
+                    {!isUser && m.tokens && (
+                      <div className={`flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-2 pt-1.5 border-t ${
+                        isGlass ? 'border-gray-600/30' : 'border-gray-700/50'
+                      }`} dir="ltr">
+                        <span className={`text-[10px] font-mono ${isGlass ? 'text-emerald-300/70' : 'text-emerald-400/70'}`}>
+                          💰 {(() => {
+                            const t = m.tokens!;
+                            const pricing: Record<string, { i: number; o: number }> = {
+                              'claude-opus-4-6': { i: 0.005, o: 0.025 },
+                              'claude-sonnet-4-6': { i: 0.003, o: 0.015 },
+                              'claude-haiku-4-5': { i: 0.001, o: 0.005 },
+                            };
+                            const mod = m.model ?? '';
+                            const key = Object.keys(pricing).find(k => mod.includes(k));
+                            const p = key ? pricing[key] : null;
+                            if (!p) return 'N/A';
+                            const cost = (t.input / 1000) * p.i + (t.output / 1000) * p.o;
+                            return cost === 0 ? 'Free' : `$${cost.toFixed(4)}`;
+                          })()}
+                        </span>
+                        <span className={`text-[10px] font-mono ${isGlass ? 'text-blue-300/70' : 'text-blue-400/70'}`}>
+                          📊 {m.tokens.total.toLocaleString()} tokens ({m.tokens.input.toLocaleString()}↓ {m.tokens.output.toLocaleString()}↑)
+                        </span>
+                        <span className={`text-[10px] font-mono ${isGlass ? 'text-amber-300/70' : 'text-amber-400/70'}`}>
+                          🤖 {m.agent ?? '?'} · {m.model ? m.model.replace(/^anthropic\//, '').replace(/^openai\//, '').replace(/:free$/, ' (free)').split('/').pop() : m.provider ?? '?'}
+                        </span>
+                        {m.elapsed != null && (
+                          <span className={`text-[10px] font-mono ${isGlass ? 'text-purple-300/70' : 'text-purple-400/70'}`}>
+                            ⏱️ {m.elapsed}s
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Timestamp */}
                     <p className={`text-[10px] mt-1 ${

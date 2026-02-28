@@ -13,7 +13,8 @@ export type NotificationType =
   | 'evolution_complete'
   | 'update_available'
   | 'ecosystem_discovery'
-  | 'security_alert';
+  | 'security_alert'
+  | 'cron_publish';
 
 export type NotificationSeverity = 'info' | 'warning' | 'success' | 'critical';
 export type NotificationSource = 'llm-tracker' | 'auto-upgrade' | 'evolution' | 'heartbeat' | 'updater' | 'ecosystem-scanner' | 'self-repair' | 'system';

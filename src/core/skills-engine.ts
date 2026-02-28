@@ -64,6 +64,54 @@ const BUILT_IN_SKILLS: Skill[] = [
     examples: ['Write an email to my boss', 'Draft a follow-up email', 'כתוב מייל'],
     version: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'built-in',
   },
+  {
+    id: 'browser-signup',
+    name: 'Browser Signup',
+    description: 'Automate website registration and account creation',
+    trigger: '(sign.?up|register|הירשם|תירשם|create.*account|צור.*חשבון|הרשמה)',
+    prompt: `You are a signup automation expert. Use the browser tool to:
+1. Navigate to the target website
+2. Find the registration/signup form
+3. Fill all required fields (use provided details or generate reasonable ones)
+4. Handle email verification steps if possible
+5. Take a screenshot after completion
+6. Report the credentials used
+IMPORTANT: Never use real credit cards. If payment is required, stop and ask the user. Save successful signup patterns to memory.`,
+    examples: ['Sign up for AliExpress', 'הירשם לאתר', 'Create an account on Fiverr', 'Register on alibaba.com'],
+    version: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'built-in',
+  },
+  {
+    id: 'browser-scrape',
+    name: 'Browser Scrape',
+    description: 'Scrape and extract data from websites',
+    trigger: '(scrape|extract|גרד|חלץ|scraping|data.*from|מידע.*מ)',
+    prompt: `You are a web scraping expert. Use the browser tool to:
+1. Navigate to the target page
+2. Wait for content to load (use wait action if needed)
+3. Extract the requested data using selectors or evaluate
+4. Handle pagination if needed (click "next", scroll, etc.)
+5. Format extracted data clearly (tables, lists, JSON)
+6. If blocked, try: scrolling slowly, waiting between actions, changing approach
+TIPS: Use get_links for link extraction, extract for text, evaluate for complex DOM queries.`,
+    examples: ['Scrape product prices from Amazon', 'Extract supplier info from AliExpress', 'גרד מידע מהאתר'],
+    version: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'built-in',
+  },
+  {
+    id: 'browser-form',
+    name: 'Browser Form Fill',
+    description: 'Automatically fill web forms',
+    trigger: '(fill.*form|מלא.*טופס|submit.*form|שלח.*טופס|fill.*fields|auto.*fill)',
+    prompt: `You are a form automation expert. Use the browser tool to:
+1. Navigate to the form page
+2. Identify all form fields (use extract or evaluate to inspect)
+3. Fill each field with provided or appropriate data
+4. Handle dropdowns (click + select), checkboxes, radio buttons
+5. Take a screenshot before submission for user verification
+6. Submit only after user confirmation for important forms
+For complex forms: fill_form action with {selector: value} pairs is most efficient.`,
+    examples: ['Fill the contact form', 'מלא את הטופס', 'Submit the application form'],
+    version: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'built-in',
+  },
 ];
 
 export class SkillsEngine {

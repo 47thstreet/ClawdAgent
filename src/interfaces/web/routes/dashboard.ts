@@ -330,6 +330,33 @@ export function setupDashboardRoutes(deps: {
       links.push({ source: 'engine', target: `vps:${srv.id}`, type: 'manages' });
     }
 
+    // Browser Infrastructure — VNC stack and automation
+    const browserNodes = [
+      { id: 'browser:session-manager', name: 'Session Manager', desc: 'Manages browser sessions lifecycle — create, close, attach/detach VNC on-demand.', val: 4 },
+      { id: 'browser:xvfb', name: 'Xvfb', desc: 'Virtual framebuffer — provides a virtual display for headed browsers without a physical screen.', val: 2 },
+      { id: 'browser:x11vnc', name: 'x11vnc', desc: 'VNC server — streams the virtual display so users can watch the browser live.', val: 2 },
+      { id: 'browser:websockify', name: 'websockify', desc: 'WebSocket proxy — bridges VNC protocol to WebSocket for browser-based viewing via noVNC.', val: 2 },
+      { id: 'browser:novnc', name: 'noVNC', desc: 'Browser-based VNC client — renders the live browser view in the Browser View dashboard.', val: 2 },
+      { id: 'browser:stealth', name: 'Stealth Engine', desc: 'Anti-detection: canvas noise, WebDriver masking, fingerprint randomization. Passes most bot checks.', val: 2.5 },
+    ];
+    for (const bn of browserNodes) {
+      nodes.push({ id: bn.id, name: bn.name, group: 'browser', val: bn.val, desc: bn.desc });
+    }
+    // Links: engine → session-manager → VNC stack chain
+    links.push({ source: 'engine', target: 'browser:session-manager', type: 'manages' });
+    links.push({ source: 'browser:session-manager', target: 'browser:xvfb', type: 'starts' });
+    links.push({ source: 'browser:session-manager', target: 'browser:stealth', type: 'applies' });
+    links.push({ source: 'browser:xvfb', target: 'browser:x11vnc', type: 'streams-to' });
+    links.push({ source: 'browser:x11vnc', target: 'browser:websockify', type: 'proxied-by' });
+    links.push({ source: 'browser:websockify', target: 'browser:novnc', type: 'viewed-in' });
+    // Link browser-using agents to session manager
+    const browserAgents = ['web-agent', 'researcher', 'ai-app-builder', 'mrr-strategist'];
+    for (const agentId of browserAgents) {
+      if (agents.some(a => a.id === agentId)) {
+        links.push({ source: `agent:${agentId}`, target: 'browser:session-manager', type: 'uses' });
+      }
+    }
+
     res.json({ nodes, links });
   });
 

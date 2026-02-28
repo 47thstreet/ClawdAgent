@@ -41,6 +41,7 @@ import { Updater } from './core/updater.js';
 import { OpenClawSync } from './core/openclaw-sync.js';
 import { PluginLoader } from './core/plugin-loader.js';
 import { initKeyRotation, stopKeyRotation } from './security/key-rotation.js';
+import { SocialTool } from './agents/tools/social-tool.js';
 // Self-Evolution imports
 import { notificationStore, setNotificationEmitter } from './core/notification-store.js';
 import { LLMEcosystemTracker } from './core/llm-ecosystem-tracker.js';
@@ -521,6 +522,81 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
   // Auto-Promoter — continuous promotion across all channels
   setPromoterAI(aiChatHelper);
   registerPromoterCron(cronEngine);
+
+  // AI-powered cron publishing — generates content from prompt and publishes to social media
+  cronEngine.registerAction('ai_publish', async (task) => {
+    const prompt = String(task.actionData?.prompt || task.actionData?.message || 'Generate a promotional social media post');
+    const platforms = (task.actionData?.platforms as string[]) || ['twitter', 'linkedin', 'facebook'];
+
+    logger.info('ai_publish: generating content', { taskId: task.id, platforms });
+
+    // Generate content using AI — try Claude Code CLI first, then OpenRouter, then fallback
+    let content = '';
+    const systemPrompt = `You are an expert social media marketer. Write a single social media post based on the user's instructions.
+Rules:
+- Write ONLY the post text — no explanations, no formatting
+- Include relevant hashtags
+- Keep it engaging and professional
+- Stay under 280 characters for Twitter-compatible platforms
+- Include any URLs mentioned in the instructions`;
+
+    try {
+      // Try Claude Code CLI first (it's connected and free)
+      const response = await engine.getAIClient().chat({
+        systemPrompt,
+        messages: [{ role: 'user', content: prompt }],
+        maxTokens: 500,
+        temperature: 0.7,
+      });
+      content = response.content?.trim() || '';
+    } catch (err: any) {
+      logger.warn('ai_publish: primary AI failed, trying fallback', { error: err.message });
+      try {
+        content = await aiChatHelper(systemPrompt, prompt);
+      } catch {
+        content = '';
+      }
+    }
+
+    if (!content) {
+      const errMsg = 'AI content generation failed — all providers returned empty. Check OpenRouter API key and Claude Code CLI connection.';
+      logger.error('ai_publish: content generation failed', { taskId: task.id });
+      notificationStore.push({
+        type: 'cron_publish',
+        title: `FAILED: ${task.name}`,
+        body: errMsg,
+        severity: 'warning',
+        source: 'system',
+      });
+      await notificationStore.flush();
+      throw new Error(errMsg);
+    }
+
+    logger.info('ai_publish: content generated', { taskId: task.id, contentLength: content.length });
+
+    // Publish via Blotato to all target platforms
+    const socialTool = new SocialTool();
+    const result = await socialTool.execute({
+      action: 'publish_all',
+      text: content,
+      platforms,
+    });
+
+    const publishSummary = result.success ? result.output : `Publish failed: ${result.error}`;
+
+    // Push notification to bell icon
+    notificationStore.push({
+      type: 'cron_publish',
+      title: `Published: ${task.name}`,
+      body: `Content: ${content.slice(0, 150)}${content.length > 150 ? '...' : ''}\n\nPlatforms: ${platforms.join(', ')}\n${publishSummary}`,
+      severity: result.success ? 'success' : 'warning',
+      source: 'system',
+    });
+    await notificationStore.flush();
+
+    logger.info('ai_publish: done', { taskId: task.id, success: result.success });
+    return `Published to ${platforms.join(', ')}:\n${content.slice(0, 200)}`;
+  });
 
   // Register default workflow action handlers
   workflowEngine.registerHandler('send_message', async (config) => {

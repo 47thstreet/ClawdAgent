@@ -25,6 +25,7 @@ import { TradingTool } from '../agents/tools/trading-tool.js';
 import { RAGTool } from '../agents/tools/rag-tool.js';
 import { WhatsAppTool } from '../agents/tools/whatsapp-tool.js';
 import { FalTool } from '../agents/tools/fal-tool.js';
+import { FacebookTool } from '../agents/tools/facebook-tool.js';
 import { BaseTool, ToolResult } from '../agents/tools/base-tool.js';
 import { hasPermission } from '../security/roles.js';
 import { audit } from '../security/audit-log.js';
@@ -102,6 +103,7 @@ export function initTools(): void {
   toolInstances.set('rag', new RAGTool());
   toolInstances.set('whatsapp', new WhatsAppTool());
   toolInstances.set('fal', new FalTool());
+  toolInstances.set('facebook', new FacebookTool());
 
   // Apply config-driven overrides (TOOLS_DISABLED env var)
   const registry = getToolRegistry();
@@ -765,6 +767,30 @@ export function getToolDefinitions(allowedTools: string[]): any[] {
     });
     // Append existing dynamic tool definitions
     definitions.push(...toolCreatorRef.getToolDefinitions());
+  }
+
+  if (allowedTools.includes('facebook')) {
+    definitions.push({
+      name: 'facebook',
+      description: 'Facebook account management and autonomous agent. Actions: list_accounts, account_status(accountId), start_agent(accountId, actions?, language?, tone?, topics?, testMode?), stop_agent(accountId), pause_agent(accountId), resume_agent(accountId), agent_status(accountId), agent_logs(accountId, limit?), open_facebook(accountId, url?), post(accountId, content), navigate(accountId, url). Use for: managing Facebook accounts, starting/stopping autonomous posting agents, posting to Facebook, opening logged-in Facebook sessions.',
+      input_schema: {
+        type: 'object' as const,
+        properties: {
+          action: { type: 'string' as const, enum: ['list_accounts', 'account_status', 'start_agent', 'stop_agent', 'pause_agent', 'resume_agent', 'agent_status', 'agent_logs', 'open_facebook', 'post', 'navigate'], description: 'Facebook action' },
+          accountId: { type: 'string' as const, description: 'Facebook account ID' },
+          content: { type: 'string' as const, description: 'Post content (for post action)' },
+          url: { type: 'string' as const, description: 'URL to navigate to (for navigate/open_facebook)' },
+          actions: { type: 'array' as const, items: { type: 'string' as const }, description: 'Agent actions: post, comment, friend_request, group_join, message' },
+          language: { type: 'string' as const, description: 'Content language (default: Hebrew)' },
+          tone: { type: 'string' as const, description: 'Content tone (default: friendly and engaging)' },
+          topics: { type: 'array' as const, items: { type: 'string' as const }, description: 'Content topics' },
+          groups: { type: 'array' as const, items: { type: 'string' as const }, description: 'Facebook group URLs for the agent' },
+          testMode: { type: 'boolean' as const, description: 'Test mode — log actions without executing (default: false)' },
+          limit: { type: 'number' as const, description: 'Number of logs to return (for agent_logs)' },
+        },
+        required: ['action'],
+      },
+    });
   }
 
   return definitions;

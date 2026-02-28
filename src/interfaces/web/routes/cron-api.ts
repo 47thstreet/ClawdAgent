@@ -128,6 +128,31 @@ export function setupCronRoutes(engine: Engine): Router {
     }
   });
 
+  // POST /api/cron/:id/trigger — manually trigger a cron task now
+  router.post('/:id/trigger', async (req: Request, res: Response) => {
+    try {
+      const cronEngine = engine.getCronEngine();
+      if (!cronEngine) {
+        res.status(503).json({ error: 'Cron engine not available' });
+        return;
+      }
+
+      const taskId = String(req.params.id);
+      logger.info('Cron task manually triggered', { taskId });
+
+      // Run in background so we can return immediately
+      cronEngine.triggerTask(taskId).then((result: string) => {
+        logger.info('Cron task manual trigger completed', { taskId, result: result?.slice(0, 200) });
+      }).catch((err: Error) => {
+        logger.error('Cron task manual trigger failed', { taskId, error: err.message });
+      });
+
+      res.json({ success: true, message: `Task triggered. Results will appear in notifications.` });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ─── DLQ Endpoints ────────────────────────────────────────────
 
   // GET /api/cron/dlq — list dead letter queue entries

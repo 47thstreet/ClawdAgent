@@ -254,6 +254,34 @@ export class CronEngine {
     return before - this.dlq.length;
   }
 
+  /** Manually trigger a task immediately (for dashboard "Run Now" button) */
+  async triggerTask(taskId: string): Promise<string> {
+    const task = this.tasks.get(taskId);
+    if (!task) throw new Error(`Task not found: ${taskId}`);
+
+    const handler = this.actionHandlers.get(task.action);
+    if (!handler) throw new Error(`No handler for action: ${task.action}`);
+
+    if (this.runningLocks.has(taskId)) throw new Error('Task is already running');
+    this.runningLocks.add(taskId);
+
+    try {
+      const result = await handler(task);
+      task.lastRun = new Date().toISOString();
+      await this.persistTask(task);
+
+      if (this.notifyFn && result) {
+        await this.notifyFn(task.userId, task.platform, `⏰ **${task.name}** (manual)\n${result}`);
+      }
+      return result;
+    } catch (err: any) {
+      this.handleFailure(task, err.message, 1);
+      throw err;
+    } finally {
+      this.runningLocks.delete(taskId);
+    }
+  }
+
   async removeTask(taskId: string): Promise<boolean> {
     const job = this.jobs.get(taskId);
     if (job) { job.stop(); this.jobs.delete(taskId); }

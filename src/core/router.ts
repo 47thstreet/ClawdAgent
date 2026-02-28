@@ -53,6 +53,7 @@ export enum Intent {
   WHATSAPP_CONNECT = 'whatsapp_connect',
   BUILD_APP = 'build_app',
   MRR_STRATEGY = 'mrr_strategy',
+  FACEBOOK_ACTION = 'facebook_action',
 }
 
 export interface RoutingResult {
@@ -114,6 +115,7 @@ Available intents:
 - crypto_portfolio: Check crypto portfolio, P&L, holdings, stats — תיק קריפטו, portfolio, P&L, רווח, הפסד, אחזקות, holdings
 - server_scan: Scan/discover what's on a server — capabilities, tools, projects, databases — תסרוק שרת, scan server, מה יש בשרת, what's on the server, discover, תגלה מה רץ, /server scan
 - whatsapp_connect: Connect WhatsApp, get QR code, check WhatsApp status — חבר ווטסאפ, התחבר לוואטסאפ, QR, קוד QR, whatsapp connect, whatsapp status, link whatsapp
+- facebook_action: Facebook account management, autonomous Facebook agent, post to Facebook, Facebook automation, manage Facebook accounts — תפרסם בפייסבוק, תפעיל אייג'נט פייסבוק, חשבון פייסבוק, facebook agent, פייסבוק אוטומטי, תעשה פוסט בפייסבוק, תנהל פייסבוק
 
 Hebrew examples:
 - "מה מצב השרת" → server_status
@@ -172,6 +174,13 @@ Hebrew examples:
 - "חבר ווטסאפ" → whatsapp_connect
 - "תראה QR" → whatsapp_connect
 - "connect whatsapp" → whatsapp_connect
+- "תפרסם בפייסבוק" → facebook_action
+- "תפעיל אייג'נט פייסבוק" → facebook_action
+- "post to facebook" → facebook_action
+- "start facebook agent" → facebook_action
+- "facebook accounts" → facebook_action
+- "מה קורה בפייסבוק" → facebook_action
+- "תנהל את הפייסבוק" → facebook_action
 
 Respond ONLY with valid JSON (no markdown, no text before/after):
 {"intent":"<intent_name>","confidence":<0.0-1.0>,"agent":"<best_agent>","params":{"key":"value"}}
@@ -184,7 +193,8 @@ For server_manage, server_health, server_scan → use server-manager agent.
 For crypto_trade → use crypto-trader agent.
 For crypto_analyze → use crypto-analyst agent.
 For crypto_portfolio → use crypto-trader agent.
-For whatsapp_connect → use general agent.`;
+For whatsapp_connect → use general agent.
+For facebook_action → use web-agent agent.`;
 
 export class IntentRouter {
   private ai: AIClient;
@@ -268,6 +278,11 @@ export class IntentRouter {
     // Site analysis / clone
     if (/תנתח.*אתר|נתח.*אתר|analyze.*site|analyze.*website|site.*analysis|clone.*site|tech.*stack|טכנולוגי.*של.*אתר|תבנה.*אתר.*דומה/i.test(message)) {
       return { intent: Intent.SITE_ANALYZE, confidence: 0.9, agentId: 'orchestrator', extractedParams: {} };
+    }
+
+    // Facebook actions — autonomous agent, posting, account management
+    if (/facebook.*agent|agent.*facebook|אייג'?נט.*פייסבוק|פייסבוק.*אייג'?נט|תפעיל.*פייסבוק|start.*facebook|stop.*facebook|תפרסם.*בפייסבוק|post.*facebook|פוסט.*פייסבוק|תנהל.*פייסבוק|manage.*facebook|facebook.*account|חשבון.*פייסבוק|חשבונות.*פייסבוק|פייסבוק.*אוטומט|facebook.*automat|תעשה.*פוסט.*פייסבוק|לך.*לפייסבוק|go.*to.*facebook|open.*facebook|תפתח.*פייסבוק|מה.*קורה.*בפייסבוק|facebook.*status/i.test(message)) {
+      return { intent: Intent.FACEBOOK_ACTION, confidence: 0.92, agentId: 'web-agent', extractedParams: {} };
     }
 
     // Content creation (images, videos, music)
