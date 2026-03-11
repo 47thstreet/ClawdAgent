@@ -51,12 +51,12 @@ COPY --from=build /app/package.json ./package.json
 # Copy web dashboard build
 COPY --from=web-build /app/web/dist ./web/dist
 
-# Copy data files (skills, configs)
-COPY data/ ./data/
+# Copy config and tracked data files
 COPY config/ ./config/
+COPY data/skills/ ./data/skills/
 
 # Create required directories
-RUN mkdir -p logs data/skills data/projects plugins
+RUN mkdir -p logs data/projects data/conversations data/memory plugins
 
 EXPOSE 3000
 
