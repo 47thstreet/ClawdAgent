@@ -6,7 +6,8 @@ web/dist
 .env
 .env.local
 logs
-data
+data/*
+!data/skills
 coverage
 *.md
 !README.md
