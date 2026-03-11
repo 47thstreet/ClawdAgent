@@ -98,6 +98,14 @@ export const OLLAMA_MODELS: OllamaModelDef[] = [
     supportsTools: false, supportsVision: false, supportsThinking: false,
     contextSize: 8000, speedTier: 'fast',
   },
+  // ── WhatsApp Messaging — Lightweight Local Model ──
+  {
+    id: 'gemma3-1b', ollamaTag: 'gemma3:1b',
+    displayName: 'Gemma 3 1B (local)',
+    strengths: ['messaging', 'conversation', 'whatsapp', 'lightweight', 'low-latency'],
+    supportsTools: false, supportsVision: false, supportsThinking: false,
+    contextSize: 8192, speedTier: 'fast',
+  },
 ];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -133,6 +141,9 @@ export const AGENT_OLLAMA_MAP: Record<string, string> = {
   'task-planner':       'minimax-m2.5',
   'device-controller':  'minimax-m2.5',
   'desktop-controller': 'minimax-m2.5',
+
+  // WhatsApp messaging → Gemma 3 1B (isolated, lightweight, local)
+  'whatsapp-agent':     'gemma3-1b',
 };
 
 /** Resolve which Ollama model to use for a given agent */

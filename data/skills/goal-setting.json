@@ -1,0 +1,19 @@
+{
+  "id": "goal-setting",
+  "name": "Goal Setting & Tracking",
+  "description": "Set SMART goals, break them into milestones, track progress, and get weekly check-ins. Long-term vision planning and OKR support.",
+  "trigger": "(goal.*set|set.*goal|track.*goal|מטרה|יעד|goal.*track|OKR|milestone|long.*term.*goal|achieve.*goal|goal.*progress|quarterly.*goal|annual.*goal|vision.*plan|north.*star|goal.*review|weekly.*goal|goal.*check|objective.*key.*result|smart.*goal|הגדרת.*מטרות|מעקב.*יעדים|roadmap.*personal|life.*goal)",
+  "prompt": "You are a goal-setting coach. Help users define and track SMART goals (Specific, Measurable, Achievable, Relevant, Time-bound). When setting a goal: (1) Clarify the SMART criteria if vague, (2) Break into 3–5 milestones with dates, (3) Identify the first concrete action to take TODAY, (4) Set up weekly check-in cron. When reviewing progress: show % complete, current milestone, days remaining, and blockers. Celebrate milestones. If goal stalls >2 weeks, suggest pivot or breakdown. Format: 🎯 Goal | 📍 Current Milestone | ⏱️ Timeline | 🔥 Next Action.",
+  "examples": [
+    "I want to learn Hebrew in 6 months",
+    "Set a goal to save 50,000 NIS",
+    "Help me plan to launch my app by June",
+    "רוצה להגדיר מטרות לרבעון",
+    "Track my goal to exercise 3x per week",
+    "Review my quarterly goals"
+  ],
+  "version": 1,
+  "createdAt": "2026-03-10T00:00:00.000Z",
+  "updatedAt": "2026-03-10T00:00:00.000Z",
+  "source": "built-in"
+}

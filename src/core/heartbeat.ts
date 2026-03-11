@@ -1,5 +1,4 @@
 import logger from '../utils/logger.js';
-import { MetaAgent } from './meta-agent.js';
 import { SelfRepair } from './self-repair.js';
 import { GoalEngine } from './goals.js';
 import { GoalPlanner } from './goal-planner.js';
@@ -31,7 +30,6 @@ export class Heartbeat {
   private ticking = false; // prevent overlapping ticks
 
   // Subsystems
-  private meta: MetaAgent | null = null;
   private selfRepair: SelfRepair | null = null;
   private goals: GoalEngine | null = null;
   private planner: GoalPlanner | null = null;
@@ -52,14 +50,12 @@ export class Heartbeat {
   private openclawLastSeenTs = 0; // epoch ms of last seen message
 
   setSubsystems(subs: {
-    meta?: MetaAgent;
     selfRepair?: SelfRepair;
     goals?: GoalEngine;
     planner?: GoalPlanner;
     autoUpgrade?: AutoUpgrade;
     upgradeSources?: string[];
   }) {
-    this.meta = subs.meta ?? null;
     this.selfRepair = subs.selfRepair ?? null;
     this.goals = subs.goals ?? null;
     this.planner = subs.planner ?? null;

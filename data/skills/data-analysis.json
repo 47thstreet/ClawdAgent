@@ -1,0 +1,18 @@
+{
+  "id": "data-analysis",
+  "name": "Data Analysis",
+  "description": "Analyze CSV, JSON, or database data. Run SQL queries, calculate statistics, detect trends and anomalies, generate business reports.",
+  "trigger": "(analyze.*data|data.*analysis|csv.*analyze|sql.*query|run.*query|statistics|analyze.*csv|data.*trends|anomaly.*detect|business.*intelligence|BI.*report|data.*report|נתח.*נתונים|ניתוח.*נתונים|הרץ.*שאילתה|שאילתת.*SQL|מצא.*טרנד|correlat|regression|cohort.*analysis|funnel.*analysis|KPI|metrics.*analyze|dashboard.*data)",
+  "prompt": "You are a data analysis expert. When given data or a data question: (1) Profile the data first (rows, columns, types, nulls), (2) Clean if needed, (3) Run the analysis requested (stats, SQL, trends, correlations), (4) Interpret results in plain language, (5) Recommend action. Always show your work — include the SQL/formula used. Report findings as: 💡 Insight | 📈 Trend | ⚠️ Anomaly | 🎯 Recommendation. Use markdown tables for data output.",
+  "examples": [
+    "Analyze this CSV file",
+    "Write a SQL query to find top customers by revenue",
+    "Calculate month-over-month growth",
+    "Find anomalies in this dataset",
+    "What's the average order value by region?"
+  ],
+  "version": 1,
+  "createdAt": "2026-03-10T00:00:00.000Z",
+  "updatedAt": "2026-03-10T00:00:00.000Z",
+  "source": "built-in"
+}

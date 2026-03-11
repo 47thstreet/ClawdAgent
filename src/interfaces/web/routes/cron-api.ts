@@ -24,7 +24,7 @@ export function setupCronRoutes(engine: Engine): Router {
 
   // POST /api/cron — create cron task
   router.post('/', async (req: Request, res: Response) => {
-    const { expression, action, description, platform, userId } = req.body;
+    const { expression, action, description, name, actionData, platform, userId, enabled } = req.body;
     if (!expression || !action) {
       res.status(400).json({ error: 'expression and action are required' });
       return;
@@ -43,12 +43,12 @@ export function setupCronRoutes(engine: Engine): Router {
       const task = {
         id: nanoid(),
         userId: userId ?? 'dashboard',
-        name: description || action,
+        name: name || description || action,
         expression: cronExpr,
         action,
-        actionData: {} as Record<string, unknown>,
+        actionData: (actionData && typeof actionData === 'object' ? actionData : {}) as Record<string, unknown>,
         platform: platform ?? 'web',
-        enabled: true,
+        enabled: enabled !== false,
         createdAt: new Date().toISOString(),
       };
 

@@ -323,6 +323,12 @@ export default function Chat() {
   const [showWhatsAppQR, setShowWhatsAppQR] = useState(false);
   const [whatsappQR, setWhatsappQR] = useState<{ qrDataUrl: string | null; status: string } | null>(null);
   const [whatsappLoading, setWhatsappLoading] = useState(false);
+  const [showBroadcast, setShowBroadcast] = useState(false);
+  const [broadcastGroups, setBroadcastGroups] = useState<Array<{ id: string; name: string; participantCount: number }>>([]);
+  const [broadcastSelected, setBroadcastSelected] = useState<Set<string>>(new Set());
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [broadcastSending, setBroadcastSending] = useState(false);
+  const [broadcastResult, setBroadcastResult] = useState<{ sent: number; failed: number } | null>(null);
 
   const {
     conversations, activeConversationId, isLoading, loadingConversationId,
@@ -919,6 +925,26 @@ export default function Chat() {
               <QrCode className="w-4 h-4" />
             </button>
 
+            {/* WhatsApp Broadcast */}
+            <button
+              onClick={async () => {
+                setShowBroadcast(true);
+                setBroadcastResult(null);
+                setBroadcastMessage('');
+                setBroadcastSelected(new Set());
+                try {
+                  const data = await api.whatsappGroups();
+                  setBroadcastGroups(data.groups ?? []);
+                } catch {
+                  setBroadcastGroups([]);
+                }
+              }}
+              className="p-2 text-gray-400 hover:text-green-400 hover:bg-dark-800 rounded-lg transition-colors"
+              title="Broadcast to WhatsApp Groups"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+
             {/* Divider */}
             <div className="w-px h-5 bg-gray-700 mx-0.5" />
 
@@ -1490,6 +1516,100 @@ export default function Chat() {
                   <p className="text-xs text-gray-500 mt-1">WhatsApp may not be enabled</p>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ── WhatsApp Broadcast Popup ───────────────────────── */}
+        {showBroadcast && (
+          <div className="absolute inset-0 z-40 bg-black/60 flex items-center justify-center backdrop-blur-sm" onClick={() => setShowBroadcast(false)}>
+            <div className="bg-dark-800 border border-gray-700 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Send className="w-5 h-5 text-green-400" />
+                  <h3 className="font-semibold text-white">Broadcast to WhatsApp Groups</h3>
+                </div>
+                <button onClick={() => setShowBroadcast(false)} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
+              </div>
+
+              {/* Message input */}
+              <div className="mb-4">
+                <label className="block text-xs text-gray-400 mb-1">Message / Post</label>
+                <textarea
+                  value={broadcastMessage}
+                  onChange={e => setBroadcastMessage(e.target.value)}
+                  placeholder="Write your post here... You can also paste a link 🔗"
+                  rows={5}
+                  className="w-full bg-dark-900 border border-gray-700 rounded-lg p-3 text-sm text-white placeholder-gray-500 resize-none focus:outline-none focus:border-green-500"
+                />
+              </div>
+
+              {/* Group selector */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-gray-400">Select Groups</label>
+                  <button
+                    className="text-xs text-green-400 hover:text-green-300"
+                    onClick={() => {
+                      if (broadcastSelected.size === broadcastGroups.length) {
+                        setBroadcastSelected(new Set());
+                      } else {
+                        setBroadcastSelected(new Set(broadcastGroups.map(g => g.id)));
+                      }
+                    }}
+                  >
+                    {broadcastSelected.size === broadcastGroups.length ? 'Deselect All' : 'Select All'}
+                  </button>
+                </div>
+                {broadcastGroups.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-4">No groups found. Make sure WhatsApp is connected.</p>
+                ) : (
+                  <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+                    {broadcastGroups.map(g => (
+                      <label key={g.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-dark-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={broadcastSelected.has(g.id)}
+                          onChange={() => {
+                            const next = new Set(broadcastSelected);
+                            if (next.has(g.id)) next.delete(g.id); else next.add(g.id);
+                            setBroadcastSelected(next);
+                          }}
+                          className="accent-green-400"
+                        />
+                        <span className="text-sm text-white flex-1">{g.name}</span>
+                        <span className="text-xs text-gray-500">{g.participantCount} members</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Result */}
+              {broadcastResult && (
+                <div className={`mb-3 p-3 rounded-lg text-sm ${broadcastResult.failed === 0 ? 'bg-green-900/30 text-green-400' : 'bg-yellow-900/30 text-yellow-400'}`}>
+                  ✅ Sent to {broadcastResult.sent} groups{broadcastResult.failed > 0 ? ` · ❌ ${broadcastResult.failed} failed` : ''}
+                </div>
+              )}
+
+              {/* Send button */}
+              <button
+                disabled={broadcastSending || broadcastSelected.size === 0 || !broadcastMessage.trim()}
+                onClick={async () => {
+                  setBroadcastSending(true);
+                  setBroadcastResult(null);
+                  try {
+                    const res = await api.whatsappBroadcast(Array.from(broadcastSelected), broadcastMessage.trim());
+                    setBroadcastResult({ sent: res.sent, failed: res.failed });
+                  } catch {
+                    setBroadcastResult({ sent: 0, failed: broadcastSelected.size });
+                  }
+                  setBroadcastSending(false);
+                }}
+                className="w-full py-2.5 bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                {broadcastSending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</> : <><Send className="w-4 h-4" /> Send to {broadcastSelected.size} group{broadcastSelected.size !== 1 ? 's' : ''}</>}
+              </button>
             </div>
           </div>
         )}

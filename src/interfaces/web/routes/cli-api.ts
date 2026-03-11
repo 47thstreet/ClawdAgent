@@ -1,5 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { spawn, execSync } from 'child_process';
+import { readFileSync } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
 import logger from '../../../utils/logger.js';
 import { Engine } from '../../../core/engine.js';
 
@@ -7,6 +10,11 @@ import { Engine } from '../../../core/engine.js';
 function cleanEnv(): NodeJS.ProcessEnv {
   const env = { ...process.env };
   delete env.CLAUDECODE;
+  // Ensure claude's install dir is on PATH for child processes
+  const localBin = join(homedir(), '.local', 'bin');
+  if (env.PATH && !env.PATH.includes(localBin)) {
+    env.PATH = `${localBin}:${env.PATH}`;
+  }
   return env;
 }
 
@@ -17,7 +25,10 @@ function cleanEnv(): NodeJS.ProcessEnv {
 function captureLoginUrl(): Promise<string | null> {
   return new Promise((resolve) => {
     const outFile = `/tmp/claude-login-${Date.now()}.txt`;
-    const proc = spawn('script', ['-qc', 'claude auth login', outFile], {
+    // Validate CLAUDE_PATH to prevent command injection — must be absolute path or bare command name
+    const rawPath = process.env.CLAUDE_PATH ?? 'claude';
+    const claudePath = /^[a-zA-Z0-9_\-/.]+$/.test(rawPath) ? rawPath : 'claude';
+    const proc = spawn('script', ['-q', outFile, claudePath, 'auth', 'login'], {
       env: cleanEnv(),
       stdio: 'ignore',
       detached: true,
@@ -29,7 +40,7 @@ function captureLoginUrl(): Promise<string | null> {
     const interval = setInterval(() => {
       attempts++;
       try {
-        const content = execSync(`cat ${outFile} 2>/dev/null | strings`, { env: cleanEnv() }).toString();
+        const content = readFileSync(outFile, 'utf8');
         const match = content.match(/(https:\/\/claude\.ai\/oauth\/authorize[^\s\x1b\x00-\x1f]+)/);
         if (match) {
           clearInterval(interval);

@@ -1,0 +1,19 @@
+{
+  "id": "habit-tracker",
+  "name": "Habit Tracker",
+  "description": "Track daily habits, streaks, and routines. Set up new habits, log completions, review streaks, and get nudges for missed habits.",
+  "trigger": "(habit.*track|track.*habit|daily.*habit|streak|הרגל|מעקב.*הרגלים|logged.*habit|complete.*habit|habit.*check|routine.*track|habit.*streak|missed.*habit|daily.*routine|morning.*routine|build.*habit|habit.*goal|21.*days|66.*days|consistency)",
+  "prompt": "You are a habit tracking assistant. When user mentions a habit: (1) Add it to their habit list with frequency (daily/weekly/custom), (2) When they log completion, mark it done and update streak, (3) Show current streak + longest streak, (4) Alert when a habit is missed, (5) Weekly review: completion rate per habit. Format: ✅ [habit] — Streak: N days (Best: M) | 💪 [completion rate]%. Celebrate milestones at 7, 21, 30, 66, 100 days. Be encouraging, never judgmental.",
+  "examples": [
+    "I want to track daily exercise",
+    "Log meditation for today",
+    "What's my habit streak?",
+    "רצון לעקוב אחרי שתיית מים",
+    "Show my habits for this week",
+    "I missed my morning run"
+  ],
+  "version": 1,
+  "createdAt": "2026-03-10T00:00:00.000Z",
+  "updatedAt": "2026-03-10T00:00:00.000Z",
+  "source": "built-in"
+}

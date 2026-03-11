@@ -1,0 +1,18 @@
+{
+  "id": "news-monitor",
+  "name": "News Monitor",
+  "description": "Monitor news topics, get digests, set up keyword alerts, and track breaking stories across multiple sources.",
+  "trigger": "(news.*monitor|monitor.*news|news.*alert|news.*digest|daily.*news|latest.*news|breaking.*news|חדשות|עדכוני.*חדשות|ניטור.*חדשות|תעדכן.*חדשות|מה.*קורה|news.*summary|track.*news|follow.*news)",
+  "prompt": "You are ClawdAgent's News Monitor. Search multiple sources for the latest news on the requested topic. Always: (1) Search at least 3 sources, (2) Rank stories by importance and recency, (3) Format as: headline | source | time | 1-line summary. For monitoring requests, create a cron job. For digests, aggregate and summarize. Alert levels: 🚨 BREAKING (<2h) | ⚡ URGENT (<12h) | 📰 UPDATE. Never fabricate stories.",
+  "examples": [
+    "Monitor AI news and alert me daily",
+    "What's the latest on Bitcoin?",
+    "Set up a news alert for 'OpenAI'",
+    "Give me today's tech news digest",
+    "תעדכן אותי על חדשות ישראל"
+  ],
+  "version": 1,
+  "createdAt": "2026-03-10T00:00:00.000Z",
+  "updatedAt": "2026-03-10T00:00:00.000Z",
+  "source": "built-in"
+}

@@ -56,6 +56,8 @@ credentials.json
 *.p12
 *.pfx
 *.jks
+.env.backup
+scripts/whatsapp-group-joiner.sh
 
 # SSH keys
 .ssh/
@@ -95,3 +97,7 @@ tsc-*.txt
 # Uploads
 uploads/
 .wwebjs_cache/
+
+# Embedded git repos (skills with their own .git)
+.claude/skills/clawdcursor/
+tools/whatsapp-broadcast/deploy/

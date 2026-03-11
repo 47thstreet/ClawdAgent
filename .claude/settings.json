@@ -1,74 +1,5 @@
 {
-  "$schema": "https://code.claude.com/schemas/settings.json",
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "INPUT=$(cat); CMD=$(echo \"$INPUT\" | jq -r '.tool_input.command // empty'); if echo \"$CMD\" | grep -qE '(rm -rf /|rm -rf \\*|DROP DATABASE|TRUNCATE TABLE|:(){ :|:& };:)'; then echo '{\"permissionDecision\": \"deny\", \"message\": \"BLOCKED: Dangerous command detected!\"}'; exit 2; fi",
-            "timeout": 5000
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "BRANCH=$(git branch --show-current 2>/dev/null); if [ \"$BRANCH\" = \"main\" ] || [ \"$BRANCH\" = \"master\" ]; then echo '{\"permissionDecision\": \"deny\", \"message\": \"BLOCKED: Cannot edit directly on main/master. Create a feature branch first.\"}'; exit 2; fi",
-            "timeout": 5000
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "INPUT=$(cat); FILE=$(echo \"$INPUT\" | jq -r '.tool_input.file_path // .tool_input.path // empty'); if [ -n \"$FILE\" ] && echo \"$FILE\" | grep -qE '\\.(ts|tsx)$'; then if command -v npx &>/dev/null; then RESULT=$(npx tsc --noEmit 2>&1 | head -10); if [ -n \"$RESULT\" ]; then echo \"{\\\"feedback\\\": \\\"TypeCheck results:\\n$RESULT\\\"}\"; fi; fi; fi",
-            "timeout": 15000
-          }
-        ]
-      }
-    ],
-    "Setup": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo '{\"feedback\": \"Session started. CLAUDE.md loaded. Checking environment...\"}'; if [ -f package.json ] && [ ! -d node_modules ]; then echo '{\"feedback\": \"WARNING: node_modules missing. Run npm install.\"}'; fi; if [ -f .env.example ] && [ ! -f .env ]; then echo '{\"feedback\": \"WARNING: .env file missing. Copy from .env.example.\"}'; fi; BRANCH=$(git branch --show-current 2>/dev/null); if [ -n \"$BRANCH\" ]; then echo \"{\\\"feedback\\\": \\\"Git branch: $BRANCH\\\"}\"; fi; if command -v typescript-language-server &>/dev/null; then echo '{\"feedback\": \"LSP: TypeScript server available\"}'; else echo '{\"feedback\": \"WARNING: typescript-language-server not found. Run: npm i -g typescript-language-server\"}'; fi",
-            "timeout": 10000
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "INPUT=$(cat); AGENT_ID=$(echo \"$INPUT\" | jq -r '.agent_id // empty'); TRANSCRIPT=$(echo \"$INPUT\" | jq -r '.agent_transcript_path // empty'); if [ -n \"$AGENT_ID\" ]; then echo \"{\\\"feedback\\\": \\\"Subagent $AGENT_ID completed. Transcript: $TRANSCRIPT\\\"}\"; fi",
-            "timeout": 5000
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "INPUT=$(cat); STOP_ACTIVE=$(echo \"$INPUT\" | jq -r '.stop_hook_active // false'); if [ \"$STOP_ACTIVE\" = \"true\" ]; then exit 0; fi; if [ -f package.json ]; then RESULT=$(npm run build 2>&1); ERRORS=$(echo \"$RESULT\" | grep -ci 'error' || true); if [ \"$ERRORS\" -gt 0 ] && [ \"$ERRORS\" -lt 5 ]; then echo \"{\\\"decision\\\": \\\"block\\\", \\\"reason\\\": \\\"Build has $ERRORS error(s). Fix them before completing.\\\"}\"; fi; fi",
-            "timeout": 30000
-          }
-        ]
-      }
-    ]
-  },
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "85",
@@ -155,7 +86,13 @@
       "Read(//usr/lib/**)",
       "Read(//usr/share/novnc/**)",
       "Read(//home/clickdrop-clawdagent/htdocs/clawdagent.clickdrop.online/data/skills/**)",
-      "WebFetch(domain:api.github.com)"
+      "WebFetch(domain:api.github.com)",
+      "Bash(JWT_PATH=\"/Users/tbp/Desktop/ClawdAgent/node_modules/.pnpm/jsonwebtoken@9.0.3/node_modules/jsonwebtoken\")",
+      "Bash(__NEW_LINE_068a71265c4ea381__ node -e \":*)",
+      "mcp__github__create_repository",
+      "Bash(git config user.email)",
+      "Bash(git config user.name)",
+      "Bash(git push)"
     ],
     "deny": [
       "Bash(rm -rf /)",
@@ -168,6 +105,75 @@
       "/home/clickdrop-clawdagent/htdocs/clawdagent.clickdrop.online/data/skills"
     ]
   },
-  "enabledPlugins": [],
-  "extraKnownMarketplaces": []
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "INPUT=$(cat); CMD=$(echo \"$INPUT\" | jq -r '.tool_input.command // empty'); if echo \"$CMD\" | grep -qE '(rm -rf /|rm -rf \\*|DROP DATABASE|TRUNCATE TABLE|:(){ :|:& };:)'; then echo '{\"permissionDecision\": \"deny\", \"message\": \"BLOCKED: Dangerous command detected!\"}'; exit 2; fi",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "BRANCH=$(git branch --show-current 2>/dev/null); if [ \"$BRANCH\" = \"main\" ] || [ \"$BRANCH\" = \"master\" ]; then echo '{\"permissionDecision\": \"deny\", \"message\": \"BLOCKED: Cannot edit directly on main/master. Create a feature branch first.\"}'; exit 2; fi",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "INPUT=$(cat); FILE=$(echo \"$INPUT\" | jq -r '.tool_input.file_path // .tool_input.path // empty'); if [ -n \"$FILE\" ] && echo \"$FILE\" | grep -qE '\\.(ts|tsx)$'; then if command -v npx &>/dev/null; then RESULT=$(npx tsc --noEmit 2>&1 | head -10); if [ -n \"$RESULT\" ]; then echo \"{\\\"feedback\\\": \\\"TypeCheck results:\\n$RESULT\\\"}\"; fi; fi; fi",
+            "timeout": 15000
+          }
+        ]
+      }
+    ],
+    "Setup": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"feedback\": \"Session started. CLAUDE.md loaded. Checking environment...\"}'; if [ -f package.json ] && [ ! -d node_modules ]; then echo '{\"feedback\": \"WARNING: node_modules missing. Run npm install.\"}'; fi; if [ -f .env.example ] && [ ! -f .env ]; then echo '{\"feedback\": \"WARNING: .env file missing. Copy from .env.example.\"}'; fi; BRANCH=$(git branch --show-current 2>/dev/null); if [ -n \"$BRANCH\" ]; then echo \"{\\\"feedback\\\": \\\"Git branch: $BRANCH\\\"}\"; fi; if command -v typescript-language-server &>/dev/null; then echo '{\"feedback\": \"LSP: TypeScript server available\"}'; else echo '{\"feedback\": \"WARNING: typescript-language-server not found. Run: npm i -g typescript-language-server\"}'; fi",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "INPUT=$(cat); AGENT_ID=$(echo \"$INPUT\" | jq -r '.agent_id // empty'); TRANSCRIPT=$(echo \"$INPUT\" | jq -r '.agent_transcript_path // empty'); if [ -n \"$AGENT_ID\" ]; then echo \"{\\\"feedback\\\": \\\"Subagent $AGENT_ID completed. Transcript: $TRANSCRIPT\\\"}\"; fi",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "INPUT=$(cat); STOP_ACTIVE=$(echo \"$INPUT\" | jq -r '.stop_hook_active // false'); if [ \"$STOP_ACTIVE\" = \"true\" ]; then exit 0; fi; if [ -f package.json ]; then RESULT=$(npm run build 2>&1); ERRORS=$(echo \"$RESULT\" | grep -ci 'error' || true); if [ \"$ERRORS\" -gt 0 ] && [ \"$ERRORS\" -lt 5 ]; then echo \"{\\\"decision\\\": \\\"block\\\", \\\"reason\\\": \\\"Build has $ERRORS error(s). Fix them before completing.\\\"}\"; fi; fi",
+            "timeout": 30000
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {},
+  "extraKnownMarketplaces": {}
 }

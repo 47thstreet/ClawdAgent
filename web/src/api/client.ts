@@ -158,6 +158,8 @@ export const api = {
   // WhatsApp
   whatsappQR: () => apiRequest<{ qr: string | null; qrDataUrl: string | null; status: string }>('/whatsapp/qr'),
   whatsappStatus: () => apiRequest<{ status: string }>('/whatsapp/status'),
+  whatsappGroups: () => apiRequest<{ groups: Array<{ id: string; name: string; participantCount: number }> }>('/whatsapp/groups'),
+  whatsappBroadcast: (chatIds: string[], message: string) => apiRequest<{ results: Array<{ chatId: string; success: boolean; error?: string }>; sent: number; failed: number; total: number }>('/whatsapp/broadcast', { method: 'POST', body: JSON.stringify({ chatIds, message }) }),
 
   // Models
   getModels: () => apiRequest<{ models: Array<{ id: string; name: string; provider: string; tier: string; supportsHebrew?: boolean; supportsVision?: boolean }> }>('/models'),

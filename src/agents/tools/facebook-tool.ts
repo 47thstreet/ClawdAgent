@@ -6,7 +6,6 @@ import { BaseTool, ToolResult } from './base-tool.js';
 import { FacebookAccountManager } from '../../actions/browser/facebook-manager.js';
 import { FacebookAgent, type AgentConfig } from '../../actions/browser/facebook-agent.js';
 import { BrowserSessionManager } from '../../actions/browser/session-manager.js';
-import logger from '../../utils/logger.js';
 
 export class FacebookTool extends BaseTool {
   name = 'facebook';

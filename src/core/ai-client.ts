@@ -1155,7 +1155,6 @@ export class AIClient {
       }
 
       // Build a clear error message for the user
-      const failedProviders = providersToTry.filter(p => this.providers.has(p));
       const reasons: string[] = [];
       if (openRouterNoCredits) reasons.push('OpenRouter: אין קרדיטים');
       if (lastError?.message?.includes('timed out')) reasons.push('Claude Code CLI: timeout (יותר מדי sessions פעילים?)');

@@ -7,7 +7,7 @@ import logger from '../../utils/logger.js';
 import { Engine } from '../../core/engine.js';
 import { BaseInterface } from '../base.js';
 import { setupHandlers } from './handlers.js';
-import { setWhatsAppStatus, setLatestQR } from './auth.js';
+import { setWhatsAppStatus, setLatestQR, setWAClient, createWAClientAdapter } from './auth.js';
 
 // Reconnect settings — never give up, use exponential backoff with cap
 const RECONNECT_BASE_DELAY_MS = 10_000;
@@ -98,6 +98,7 @@ export class WhatsAppClient extends BaseInterface {
       logger.info('WhatsApp client ready');
       setWhatsAppStatus('authenticated');
       setLatestQR(null);
+      setWAClient(createWAClientAdapter(client));
       this.reconnectAttempts = 0;
     });
 
@@ -106,6 +107,7 @@ export class WhatsAppClient extends BaseInterface {
       logger.warn('WhatsApp client disconnected', { reason });
       setWhatsAppStatus('disconnected');
       setLatestQR(null);
+      setWAClient(null);
       this.scheduleReconnect();
     });
 

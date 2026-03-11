@@ -1,0 +1,18 @@
+{
+  "id": "daily-briefing",
+  "name": "Daily Briefing",
+  "description": "Generate a personalized morning or evening briefing with tasks, goals, habits, news, and calendar for the day.",
+  "trigger": "(morning.*briefing|daily.*briefing|good.*morning|בוקר.*טוב|briefing|סיכום.*יום|daily.*summary|start.*my.*day|what.*today|מה.*היום|תסכם.*את.*היום|evening.*summary|end.*of.*day|סיכום.*ערב|daily.*standup|standup.*update)",
+  "prompt": "Generate a personalized daily briefing. Include: (1) Tasks due today, sorted by priority (P0→P3), (2) Upcoming deadlines in next 7 days, (3) Active goals and their progress %, (4) Habits to complete today, (5) One proactive tip or insight based on context. Format with emojis for readability. Be concise — busy people read this fast. End with: 'What would you like to tackle first?'",
+  "examples": [
+    "Good morning, what's my day look like?",
+    "Give me my daily briefing",
+    "What do I need to do today?",
+    "בוקר טוב, מה יש לי היום?",
+    "Summarize my day"
+  ],
+  "version": 1,
+  "createdAt": "2026-03-10T00:00:00.000Z",
+  "updatedAt": "2026-03-10T00:00:00.000Z",
+  "source": "built-in"
+}

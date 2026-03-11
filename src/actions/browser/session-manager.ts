@@ -518,7 +518,7 @@ ${results.length ? `\nPROGRESS:\n${results.join('\n')}` : ''}
     ], { stdio: 'pipe' });
 
     session.xvfbProcess.on('error', (err) => logger.error('Xvfb error', { id, error: err.message }));
-    session.xvfbProcess.on('exit', (code) => {
+    session.xvfbProcess.on('exit', (_code) => {
       if (session.relaunching) return;
       if (session.status === 'running' || session.status === 'starting') {
         this.markErrorAndCleanup(session, 'Xvfb exited unexpectedly');
@@ -533,7 +533,7 @@ ${results.length ? `\nPROGRESS:\n${results.join('\n')}` : ''}
     ], { stdio: 'pipe' });
 
     session.vncProcess.on('error', (err) => logger.error('x11vnc error', { id, error: err.message }));
-    session.vncProcess.on('exit', (code) => {
+    session.vncProcess.on('exit', (_code) => {
       if (session.relaunching) return;
       if (session.status === 'running' || session.status === 'starting') {
         this.markErrorAndCleanup(session, 'VNC server exited unexpectedly');
@@ -547,7 +547,7 @@ ${results.length ? `\nPROGRESS:\n${results.join('\n')}` : ''}
     ], { stdio: 'pipe' });
 
     session.wsProcess.on('error', (err) => logger.error('websockify error', { id, error: err.message }));
-    session.wsProcess.on('exit', (code) => {
+    session.wsProcess.on('exit', (_code) => {
       if (session.relaunching) return;
       if (session.status === 'running' || session.status === 'starting') {
         this.markErrorAndCleanup(session, 'WebSocket proxy exited unexpectedly');

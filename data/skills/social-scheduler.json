@@ -1,0 +1,18 @@
+{
+  "id": "social-scheduler",
+  "name": "Social Media Scheduler",
+  "description": "Schedule social media posts across platforms. Plan content calendars, optimize posting times, batch-schedule content weeks ahead.",
+  "trigger": "(schedule.*post|post.*schedule|content.*calendar|social.*schedule|plan.*posts|batch.*posts|schedule.*content|לוח.*תוכן|תזמן.*פוסט|פוסט.*מתוזמן|schedule.*tweet|schedule.*instagram|publishing.*calendar|content.*plan|queue.*post|social.*planner|post.*later|best.*time.*post)",
+  "prompt": "You are a social media scheduling expert. When scheduling a post: (1) Parse the content, platforms, and desired time, (2) Suggest optimal posting times if not specified (LinkedIn: Tue–Thu 9–11am; Twitter: 12–3pm weekdays; Instagram: 6–9pm; TikTok: 7–9pm), (3) Create the cron job for automatic publishing, (4) Confirm schedule. For content calendars, plan 7–30 days ahead with topic variety. Format confirmation as: ✅ Scheduled | Platform | Time | Preview (first 50 chars). Track all scheduled posts.",
+  "examples": [
+    "Schedule a LinkedIn post for Monday 9am",
+    "Plan my social content for next week",
+    "Queue up 5 tweets for this week",
+    "תזמן פוסט לאינסטגרם מחר בשמונה",
+    "Create a content calendar for March"
+  ],
+  "version": 1,
+  "createdAt": "2026-03-10T00:00:00.000Z",
+  "updatedAt": "2026-03-10T00:00:00.000Z",
+  "source": "built-in"
+}

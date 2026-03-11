@@ -168,7 +168,7 @@ export class Engine {
   private meta: MetaAgent;
   private goals: GoalEngine;
   private planner: GoalPlanner;
-  private autoLearn: AutoLearn;
+  private readonly _subsystems: unknown[] = []; // lifetime anchors
   private desktop: DesktopController;
   private desktopVision: AIDesktopVision | null = null;
   private projectBuilder: ProjectBuilder;
@@ -194,7 +194,7 @@ export class Engine {
     this.meta = new MetaAgent(this.ai);
     this.goals = new GoalEngine();
     this.planner = new GoalPlanner(this.ai);
-    this.autoLearn = new AutoLearn(this.ai);
+    this._subsystems.push(new AutoLearn(this.ai));
     this.desktop = new DesktopController();
     if (this.desktop.isEnabled()) {
       this.desktopVision = new AIDesktopVision(this.ai, this.desktop);
@@ -412,6 +412,10 @@ export class Engine {
       if (incoming.model === 'claude-code-cli') {
         selectedProvider = 'claude-code';
         selectedModelId = undefined;
+      } else if (incoming.model?.startsWith('ollama:')) {
+        selectedProvider = 'ollama';
+        selectedModelId = incoming.model.slice('ollama:'.length);
+        logger.info('Model override from UI (quick) — Ollama', { model: selectedModelId });
       } else if (userModelOverride) {
         selectedProvider = userModelOverride.provider as typeof selectedProvider;
         selectedModelId = userModelOverride.id;
@@ -1056,6 +1060,27 @@ If they want to check a running project, use "status" with projectName.`,
         logger.info('Deep mode activated', { agent: agent.id, maxTokens: 16384, tools: agent.tools.length, estimatedCost: estimatedCost.toFixed(4) });
       }
 
+      // 3b. Session isolation — agents with isolatedSession use their own history namespace
+      let activeHistory = history;
+      if (agent.isolatedSession) {
+        const isolatedConvId = `agent-${agent.id}-${incoming.userId}`;
+        const rawIsolated = this.getHistory
+          ? await this.getHistory(incoming.userId, incoming.platform, 20, isolatedConvId)
+          : [];
+        activeHistory = rawIsolated.filter(m => {
+          if (typeof m.content === 'string') return (m.content as string).trim().length > 0;
+          if (Array.isArray(m.content)) return (m.content as unknown[]).length > 0;
+          return false;
+        });
+        // Route saves for this turn into the isolated session
+        if (_origSave) {
+          const isolatedSave = _origSave;
+          this.saveMessage = (userId, platform, role, content, metadata) =>
+            isolatedSave(userId, platform, role, content, { ...metadata, _conversationId: isolatedConvId });
+        }
+        logger.info('Agent isolated session active', { agent: agent.id, conversationId: isolatedConvId, historyLength: activeHistory.length });
+      }
+
       // 4. Match skills
       const matchedSkill = this.skills.matchSkill(incoming.text);
       if (matchedSkill) {
@@ -1089,7 +1114,7 @@ If they want to check a running project, use "status" with projectName.`,
       }
 
       const fullContext: FullContext = {
-        history,
+        history: activeHistory,
         knowledge: knowledgeStr,
         pendingTasks: tasksStr,
         servers: serversStr,
@@ -1114,12 +1139,12 @@ If they want to check a running project, use "status" with projectName.`,
       });
 
       // 7. Build message array with history (generous window for continuity)
-      const trimmedHistory = trimHistoryToFit(history, 16000);
+      const trimmedHistory = trimHistoryToFit(activeHistory, 16000);
 
       // If we had to trim, prepend a summary note so the AI knows there's earlier context
       const messages: Message[] = [];
-      if (history.length > trimmedHistory.length) {
-        const droppedCount = history.length - trimmedHistory.length;
+      if (activeHistory.length > trimmedHistory.length) {
+        const droppedCount = activeHistory.length - trimmedHistory.length;
         messages.push({ role: 'user', content: `[System note: ${droppedCount} earlier messages in this conversation were trimmed for context. The most recent messages follow. If the user references something from earlier, acknowledge you may need them to remind you.]` });
       }
       messages.push(...trimmedHistory, { role: 'user', content: incoming.text });
@@ -1161,6 +1186,10 @@ If they want to check a running project, use "status" with projectName.`,
         selectedProvider = 'claude-code';
         selectedModelId = undefined;
         logger.info('Model override from UI', { model: 'Claude Code CLI (Opus 4.6)', provider: 'claude-code' });
+      } else if (incoming.model?.startsWith('ollama:')) {
+        selectedProvider = 'ollama';
+        selectedModelId = incoming.model.slice('ollama:'.length);
+        logger.info('Model override from UI — Ollama', { model: selectedModelId });
       } else if (userModelOverride) {
         selectedModelId = userModelOverride.id;
         selectedProvider = userModelOverride.provider as typeof selectedProvider;

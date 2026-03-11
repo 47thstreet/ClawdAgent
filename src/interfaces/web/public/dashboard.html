@@ -20,7 +20,7 @@
     </button>
   </header>
 
-  <main class="max-w-7xl mx-auto p-6 grid gap-6 md:grid-cols-2">
+  <main class="max-w-7xl mx-auto p-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
 
     <!-- Status Card -->
     <div class="bg-gray-800 rounded-xl p-5 border border-gray-700">
@@ -121,6 +121,111 @@
       </div>
     </div>
 
+    <!-- WhatsApp Status Card -->
+    <div class="bg-gray-800 rounded-xl p-5 border border-gray-700 lg:col-span-1">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-gray-300">WhatsApp</h2>
+        <span class="flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full"
+          :class="{
+            'bg-green-900 text-green-300': wa.status === 'authenticated',
+            'bg-yellow-900 text-yellow-300': wa.status === 'waiting',
+            'bg-red-900 text-red-300': wa.status === 'disconnected' || wa.status === 'auth_failure',
+            'bg-gray-700 text-gray-400': !wa.status
+          }">
+          <span class="h-1.5 w-1.5 rounded-full"
+            :class="{
+              'bg-green-400': wa.status === 'authenticated',
+              'bg-yellow-400': wa.status === 'waiting',
+              'bg-red-400': wa.status === 'disconnected' || wa.status === 'auth_failure',
+              'bg-gray-500': !wa.status
+            }"></span>
+          <span x-text="wa.status || 'loading'"></span>
+        </span>
+      </div>
+
+      <!-- QR Code (when waiting) -->
+      <div x-show="wa.qrDataUrl && wa.status === 'waiting'" class="text-center mb-4">
+        <p class="text-xs text-yellow-400 mb-2">Scan with WhatsApp on your phone</p>
+        <img :src="wa.qrDataUrl" alt="WhatsApp QR" class="mx-auto rounded-lg border border-gray-600" style="width:200px;height:200px" />
+      </div>
+
+      <!-- Connected state: quick stats -->
+      <div x-show="wa.status === 'authenticated'" class="space-y-3">
+        <div class="grid grid-cols-2 gap-2 text-sm">
+          <div class="bg-gray-750 bg-opacity-50 rounded-lg p-2 border border-gray-700 text-center">
+            <p class="text-xs text-gray-400">Chats</p>
+            <p class="text-lg font-bold text-indigo-400" x-text="wa.chats.length || 0"></p>
+          </div>
+          <div class="bg-gray-750 bg-opacity-50 rounded-lg p-2 border border-gray-700 text-center">
+            <p class="text-xs text-gray-400">Unread</p>
+            <p class="text-lg font-bold text-green-400" x-text="wa.chats.reduce((s,c) => s + (c.unreadCount||0), 0)"></p>
+          </div>
+        </div>
+
+        <!-- Recent chats list -->
+        <div class="max-h-40 overflow-y-auto space-y-1">
+          <template x-for="chat in wa.chats.slice(0,8)" :key="chat.id">
+            <div class="flex items-center justify-between text-xs px-2 py-1.5 rounded-lg bg-gray-700/40 cursor-pointer hover:bg-gray-700"
+              @click="wa.selectedChat = chat.id; wa.selectedName = chat.name; loadMessages(chat.id)">
+              <span class="text-gray-200 truncate max-w-[150px]">
+                <span x-show="chat.isGroup" class="text-indigo-400 mr-1">⊞</span>
+                <span x-text="chat.name || chat.id"></span>
+              </span>
+              <span x-show="chat.unreadCount > 0"
+                class="ml-2 shrink-0 bg-green-500 text-white text-xs rounded-full px-1.5 py-0.5 font-bold"
+                x-text="chat.unreadCount"></span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Quick Send -->
+        <div class="mt-3 space-y-2">
+          <input x-model="wa.toId" placeholder="Chat ID (e.g. 972501234567@c.us)"
+            class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+          <div class="flex gap-2">
+            <input x-model="wa.sendText" placeholder="Message…" @keydown.enter="sendWAMessage()"
+              class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+            <button @click="sendWAMessage()"
+              class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-lg transition shrink-0">
+              Send
+            </button>
+          </div>
+          <p x-show="wa.sendResult" x-text="wa.sendResult"
+            :class="wa.sendOk ? 'text-green-400' : 'text-red-400'" class="text-xs"></p>
+        </div>
+      </div>
+
+      <!-- Disconnected: connect prompt -->
+      <div x-show="wa.status === 'disconnected' || wa.status === 'auth_failure'" class="text-center py-4">
+        <p class="text-sm text-gray-400 mb-3">WhatsApp is not connected.</p>
+        <button @click="fetchWAQR()" class="px-4 py-2 bg-green-700 hover:bg-green-600 text-white text-xs rounded-lg transition">
+          Get QR Code
+        </button>
+      </div>
+    </div>
+
+    <!-- WhatsApp Messages Panel (shown when a chat is selected) -->
+    <div x-show="wa.messages.length > 0" class="bg-gray-800 rounded-xl p-5 border border-gray-700 lg:col-span-2">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold text-gray-300">
+          Messages: <span class="text-indigo-400" x-text="wa.selectedName"></span>
+        </h2>
+        <button @click="wa.messages = []" class="text-xs text-gray-500 hover:text-gray-300">Close</button>
+      </div>
+      <div class="space-y-2 max-h-64 overflow-y-auto flex flex-col-reverse" id="wa-msg-container">
+        <template x-for="msg in wa.messages.slice().reverse()" :key="msg.id">
+          <div class="flex gap-2 text-xs" :class="msg.fromMe ? 'flex-row-reverse' : 'flex-row'">
+            <div class="max-w-[75%] px-3 py-2 rounded-xl"
+              :class="msg.fromMe ? 'bg-indigo-700 text-white rounded-tr-none' : 'bg-gray-700 text-gray-200 rounded-tl-none'">
+              <p x-show="!msg.fromMe" class="text-indigo-300 font-medium mb-0.5" x-text="msg.author || msg.from"></p>
+              <p x-text="msg.body || '[media]'"></p>
+              <p class="text-gray-400 mt-0.5" x-text="msg.timestamp ? new Date(msg.timestamp * 1000).toLocaleTimeString() : ''"></p>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
   </main>
 
   <footer class="text-center text-xs text-gray-600 py-4">Auto-refreshes every 30s &middot; ClawdAgent</footer>
@@ -135,6 +240,20 @@
         containers: [],
         timer: null,
 
+        // WhatsApp state
+        wa: {
+          status: null,
+          qrDataUrl: null,
+          chats: [],
+          messages: [],
+          selectedChat: null,
+          selectedName: null,
+          toId: '',
+          sendText: '',
+          sendResult: '',
+          sendOk: false,
+        },
+
         async init() {
           await this.refresh();
           this.timer = setInterval(() => this.refresh(), 30000);
@@ -147,8 +266,81 @@
             this.fetchJSON('/api/dashboard/costs', 'costs'),
             this.fetchJSON('/api/dashboard/cron', 'cron'),
             this.fetchJSON('/api/dashboard/containers', 'containers'),
+            this.refreshWA(),
           ]);
           this.loading = false;
+        },
+
+        async refreshWA() {
+          try {
+            const res = await fetch('/api/whatsapp/qr');
+            if (!res.ok) return;
+            const data = await res.json();
+            this.wa.status = data.status;
+            this.wa.qrDataUrl = data.qrDataUrl ?? null;
+            if (data.status === 'authenticated' && this.wa.chats.length === 0) {
+              await this.loadWAChats();
+            }
+          } catch { /* keep stale */ }
+        },
+
+        async loadWAChats() {
+          try {
+            const res = await fetch('/api/whatsapp/chats?limit=50');
+            if (!res.ok) return;
+            const data = await res.json();
+            this.wa.chats = data.chats ?? [];
+          } catch {}
+        },
+
+        async fetchWAQR() {
+          try {
+            const res = await fetch('/api/whatsapp/qr');
+            if (!res.ok) return;
+            const data = await res.json();
+            this.wa.status = data.status;
+            this.wa.qrDataUrl = data.qrDataUrl ?? null;
+          } catch {}
+        },
+
+        async loadMessages(chatId) {
+          try {
+            const res = await fetch(`/api/whatsapp/messages/${encodeURIComponent(chatId)}?limit=50`);
+            if (!res.ok) return;
+            const data = await res.json();
+            this.wa.messages = data.messages ?? [];
+          } catch {}
+        },
+
+        async sendWAMessage() {
+          const chatId = this.wa.selectedChat || this.wa.toId;
+          const message = this.wa.sendText;
+          if (!chatId || !message) {
+            this.wa.sendResult = 'Enter a Chat ID and message.';
+            this.wa.sendOk = false;
+            return;
+          }
+          try {
+            const res = await fetch('/api/whatsapp/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ chatId, message }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              this.wa.sendResult = 'Sent!';
+              this.wa.sendOk = true;
+              this.wa.sendText = '';
+              if (chatId === this.wa.selectedChat) await this.loadMessages(chatId);
+            } else {
+              this.wa.sendResult = data.error ?? 'Failed to send.';
+              this.wa.sendOk = false;
+            }
+          } catch (e) {
+            this.wa.sendResult = 'Network error.';
+            this.wa.sendOk = false;
+          }
+          setTimeout(() => { this.wa.sendResult = ''; }, 4000);
         },
 
         async fetchJSON(url, key) {

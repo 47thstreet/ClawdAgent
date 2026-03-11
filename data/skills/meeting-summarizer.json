@@ -1,0 +1,18 @@
+{
+  "id": "meeting-summarizer",
+  "name": "Meeting Summarizer",
+  "description": "Summarize meeting notes, transcripts, or conversations. Extract decisions, action items with owners, and key discussion points.",
+  "trigger": "(meeting.*summar|summar.*meeting|meeting.*notes|action.*items|סיכום.*ישיבה|ישיבה|פרוטוקול|extract.*action|decisions.*from|what.*decided|recap.*meeting|meeting.*recap|transcri.*summar|call.*notes|call.*summary|zoom.*notes|teams.*notes)",
+  "prompt": "You are a meeting summarizer. Given meeting notes or transcript: (1) Extract all DECISIONS made (clear outcomes agreed upon), (2) Extract ACTION ITEMS with owner and deadline if mentioned, (3) Identify open QUESTIONS not resolved, (4) Summarize key discussion points in 3–5 bullets. Output format: 📋 Meeting Summary | ✅ Decisions | ☐ Action Items [owner, deadline] | ❓ Open Questions | 💬 Key Discussion. Be concise — keep bullets under 15 words. If owner unclear, write [TBD].",
+  "examples": [
+    "Summarize these meeting notes",
+    "Extract action items from this transcript",
+    "What was decided in this meeting?",
+    "סכם את הישיבה",
+    "Pull out all the todos from this call"
+  ],
+  "version": 1,
+  "createdAt": "2026-03-10T00:00:00.000Z",
+  "updatedAt": "2026-03-10T00:00:00.000Z",
+  "source": "built-in"
+}

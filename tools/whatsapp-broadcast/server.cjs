@@ -1,0 +1,373 @@
+#!/usr/bin/env node
+'use strict';
+
+const http = require('http');
+const https = require('https');
+
+const PORT = 3050;
+const API_BASE = 'http://127.0.0.1:3000/api';
+const JWT_SECRET = process.env.JWT_SECRET || '310b04af40fcf488a9e92add4cea2fca44e83d4eb41ee41ef3ff8f8c535297be';
+
+// ── JWT (no deps) ────────────────────────────────────────────────────────────
+function base64url(buf) {
+  return Buffer.from(buf).toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+function makeToken() {
+  const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const payload = base64url(JSON.stringify({ userId: 'admin', role: 'admin', jti: 'broadcast_' + Date.now(), iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 3600 }));
+  const crypto = require('crypto');
+  const sig = base64url(crypto.createHmac('sha256', JWT_SECRET).update(header + '.' + payload).digest());
+  return header + '.' + payload + '.' + sig;
+}
+
+// ── Proxy to ClawdAgent API ──────────────────────────────────────────────────
+function apiCall(path, method = 'GET', body = null) {
+  return new Promise((resolve, reject) => {
+    const token = makeToken();
+    const data = body ? JSON.stringify(body) : null;
+    const opts = {
+      hostname: '127.0.0.1', port: 3000,
+      path: '/api' + path, method,
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', ...(data ? { 'Content-Length': Buffer.byteLength(data) } : {}) },
+    };
+    const req = http.request(opts, res => {
+      let d = '';
+      res.on('data', c => d += c);
+      res.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve({ error: d }); } });
+    });
+    req.on('error', reject);
+    if (data) req.write(data);
+    req.end();
+  });
+}
+
+// ── HTML UI ──────────────────────────────────────────────────────────────────
+const HTML = `<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WhatsApp Broadcast — The Best Parties</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh; padding: 24px 16px; }
+    .container { max-width: 640px; margin: 0 auto; }
+    .header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+    .header-icon { width: 44px; height: 44px; background: #25d366; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    h1 { font-size: 20px; font-weight: 700; color: #fff; }
+    h1 span { color: #25d366; }
+    .subtitle { font-size: 13px; color: #8b949e; margin-top: 2px; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .card h2 { font-size: 14px; font-weight: 600; color: #8b949e; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+    textarea { width: 100%; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px; color: #e6edf3; font-size: 14px; resize: vertical; min-height: 120px; font-family: inherit; outline: none; transition: border-color 0.2s; }
+    textarea:focus { border-color: #25d366; }
+    textarea::placeholder { color: #484f58; }
+    .char-count { font-size: 11px; color: #484f58; text-align: left; margin-top: 4px; }
+    .groups-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .select-all { font-size: 12px; color: #25d366; cursor: pointer; background: none; border: none; padding: 0; }
+    .select-all:hover { text-decoration: underline; }
+    .groups-list { max-height: 280px; overflow-y: auto; }
+    .groups-list::-webkit-scrollbar { width: 4px; }
+    .groups-list::-webkit-scrollbar-track { background: transparent; }
+    .groups-list::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+    .group-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background 0.15s; border: 1px solid transparent; }
+    .group-item:hover { background: #1c2128; }
+    .group-item.selected { background: #122d22; border-color: #25d36640; }
+    .group-item input[type=checkbox] { accent-color: #25d366; width: 16px; height: 16px; cursor: pointer; }
+    .group-name { flex: 1; font-size: 14px; color: #e6edf3; }
+    .group-count { font-size: 11px; color: #484f58; }
+    .group-avatar { width: 32px; height: 32px; background: #21262d; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+    .empty { text-align: center; padding: 32px; color: #484f58; font-size: 14px; }
+    .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 13px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .btn-send { background: #25d366; color: #fff; }
+    .btn-send:hover { background: #20bd5a; }
+    .btn-send:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+    .btn-refresh { background: #21262d; color: #8b949e; border: 1px solid #30363d; margin-bottom: 10px; font-size: 13px; padding: 8px; border-radius: 8px; }
+    .btn-refresh:hover { background: #2d333b; }
+    .result { padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-bottom: 16px; }
+    .result.success { background: #122d22; border: 1px solid #25d36640; color: #3fb950; }
+    .result.error { background: #2d1b1b; border: 1px solid #f8514940; color: #f85149; }
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #ffffff40; border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #122d22; color: #25d366; margin-right: 6px; }
+    .status-bar { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #484f58; margin-bottom: 20px; padding: 10px 14px; background: #161b22; border: 1px solid #30363d; border-radius: 8px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #484f58; }
+    .dot.online { background: #25d366; box-shadow: 0 0 6px #25d36680; }
+    .btn-connect { background: #21262d; color: #25d366; border: 1px solid #25d36640; font-size: 12px; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s; white-space: nowrap; }
+    .btn-connect:hover { background: #122d22; }
+    .modal-overlay { position: fixed; inset: 0; background: #000000cc; display: flex; align-items: center; justify-content: center; z-index: 100; }
+    .modal { background: #161b22; border: 1px solid #30363d; border-radius: 16px; padding: 28px; max-width: 340px; width: 90%; text-align: center; }
+    .modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .modal p { font-size: 13px; color: #8b949e; margin-bottom: 20px; }
+    .qr-wrap { background: #fff; border-radius: 12px; padding: 16px; display: inline-block; margin-bottom: 20px; }
+    .qr-wrap img { display: block; width: 220px; height: 220px; }
+    .modal-close { background: #21262d; color: #8b949e; border: 1px solid #30363d; border-radius: 8px; padding: 9px 20px; cursor: pointer; font-size: 14px; }
+    .modal-close:hover { background: #2d333b; }
+    .qr-status { font-size: 13px; color: #8b949e; margin-bottom: 16px; min-height: 20px; }
+    .progress { margin-bottom: 16px; }
+    .progress-bar-wrap { background: #21262d; border-radius: 4px; height: 6px; overflow: hidden; margin-top: 6px; }
+    .progress-bar { height: 100%; background: #25d366; border-radius: 4px; transition: width 0.3s; }
+    .progress-text { font-size: 12px; color: #8b949e; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-icon">📲</div>
+      <div>
+        <h1>WhatsApp <span>Broadcast</span></h1>
+        <div class="subtitle">The Best Parties — שליחה קבוצתית</div>
+      </div>
+    </div>
+
+    <div class="status-bar" id="statusBar">
+      <div class="dot" id="statusDot"></div>
+      <span id="statusText">בודק חיבור WhatsApp...</span>
+      <button class="btn-connect" id="connectBtn" onclick="openQR()" style="margin-right:auto">📱 התחבר לWhatsApp</button>
+    </div>
+
+    <div class="modal-overlay" id="qrModal" style="display:none">
+      <div class="modal">
+        <h3>📱 חיבור WhatsApp</h3>
+        <p>פתח WhatsApp בטלפון → התקנים מקושרים → קשר התקן ← סרוק קוד QR</p>
+        <div id="qrContent">
+          <div class="qr-wrap" id="qrWrap" style="display:none"><img id="qrImg" src="" alt="QR Code" /></div>
+          <div class="qr-status" id="qrStatusMsg">טוען...</div>
+        </div>
+        <button class="modal-close" onclick="closeQR()">סגור</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>✍️ הודעה</h2>
+      <textarea id="msgInput" placeholder="כתוב את הפוסט שלך כאן... אפשר להדביק לינק 🔗&#10;&#10;לדוגמה: 🎉 מסיבה הלילה! כרטיסים ב-Kartis ➡️ https://thebestparties.co.il" oninput="updateCount()"></textarea>
+      <div class="char-count"><span id="charCount">0</span> תווים</div>
+    </div>
+
+    <div class="card">
+      <div class="groups-header">
+        <h2 style="margin-bottom:0">👥 קבוצות (<span id="selectedCount">0</span> נבחרו)</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="select-all" onclick="selectAll()">בחר הכל</button>
+          <button class="btn btn-refresh" onclick="loadGroups()">🔄 רענן</button>
+        </div>
+      </div>
+      <div class="groups-list" id="groupsList">
+        <div class="empty">טוען קבוצות...</div>
+      </div>
+    </div>
+
+    <div id="progressWrap" class="progress" style="display:none">
+      <div class="progress-text" id="progressText">שולח...</div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
+    </div>
+
+    <div id="result" style="display:none" class="result"></div>
+
+    <button class="btn btn-send" id="sendBtn" onclick="send()" disabled>
+      <span id="sendLabel">📤 שלח לקבוצות הנבחרות</span>
+    </button>
+  </div>
+
+  <script>
+    let groups = [];
+    let selected = new Set();
+
+    async function checkStatus() {
+      try {
+        const r = await fetch('/api/status');
+        const d = await r.json();
+        const dot = document.getElementById('statusDot');
+        const txt = document.getElementById('statusText');
+        if (d.status === 'authenticated' || d.status === 'ready') {
+          dot.className = 'dot online';
+          txt.textContent = '✅ WhatsApp מחובר';
+        } else {
+          dot.className = 'dot';
+          txt.textContent = '⚠️ WhatsApp לא מחובר — ' + (d.status || 'unknown');
+        }
+      } catch { document.getElementById('statusText').textContent = '❌ ClawdAgent לא זמין על פורט 3000'; }
+    }
+
+    async function loadGroups() {
+      document.getElementById('groupsList').innerHTML = '<div class="empty">טוען...</div>';
+      try {
+        const r = await fetch('/api/groups');
+        const d = await r.json();
+        groups = d.groups || [];
+        renderGroups();
+      } catch {
+        document.getElementById('groupsList').innerHTML = '<div class="empty">❌ שגיאה בטעינת קבוצות</div>';
+      }
+    }
+
+    function renderGroups() {
+      const el = document.getElementById('groupsList');
+      if (!groups.length) { el.innerHTML = '<div class="empty">אין קבוצות זמינות</div>'; return; }
+      el.innerHTML = groups.map((g, i) => \`
+        <div class="group-item \${selected.has(g.id) ? 'selected' : ''}" onclick="toggle('\${g.id}')">
+          <input type="checkbox" \${selected.has(g.id) ? 'checked' : ''} onclick="event.stopPropagation();toggle('\${g.id}')">
+          <div class="group-avatar">\${['🎉','🎊','🥳','🎶','🪩'][i % 5]}</div>
+          <span class="group-name">\${g.name}</span>
+          <span class="group-count">\${g.participantCount || '?'} חברים</span>
+        </div>
+      \`).join('');
+      updateSendBtn();
+    }
+
+    function toggle(id) {
+      if (selected.has(id)) selected.delete(id); else selected.add(id);
+      renderGroups();
+      document.getElementById('selectedCount').textContent = selected.size;
+    }
+
+    function selectAll() {
+      if (selected.size === groups.length) { selected.clear(); } else { groups.forEach(g => selected.add(g.id)); }
+      renderGroups();
+      document.getElementById('selectedCount').textContent = selected.size;
+    }
+
+    function updateCount() {
+      document.getElementById('charCount').textContent = document.getElementById('msgInput').value.length;
+      updateSendBtn();
+    }
+
+    function updateSendBtn() {
+      const msg = document.getElementById('msgInput').value.trim();
+      document.getElementById('sendBtn').disabled = !msg || selected.size === 0;
+    }
+
+    async function send() {
+      const msg = document.getElementById('msgInput').value.trim();
+      if (!msg || selected.size === 0) return;
+      const ids = Array.from(selected);
+
+      document.getElementById('sendBtn').disabled = true;
+      document.getElementById('sendLabel').innerHTML = '<span class="spinner"></span> שולח...';
+      document.getElementById('result').style.display = 'none';
+      document.getElementById('progressWrap').style.display = 'block';
+      document.getElementById('progressBar').style.width = '0%';
+      document.getElementById('progressText').textContent = 'שולח ל-0/' + ids.length + ' קבוצות...';
+
+      try {
+        const r = await fetch('/api/broadcast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chatIds: ids, message: msg })
+        });
+        const d = await r.json();
+        document.getElementById('progressBar').style.width = '100%';
+        document.getElementById('progressText').textContent = 'הושלם!';
+
+        const res = document.getElementById('result');
+        res.style.display = 'block';
+        if (d.failed === 0) {
+          res.className = 'result success';
+          res.innerHTML = '✅ נשלח בהצלחה ל-' + d.sent + ' קבוצות!';
+        } else {
+          res.className = 'result error';
+          res.innerHTML = '⚠️ נשלח ל-' + d.sent + ' קבוצות · נכשל ב-' + d.failed;
+        }
+      } catch (e) {
+        const res = document.getElementById('result');
+        res.style.display = 'block';
+        res.className = 'result error';
+        res.innerHTML = '❌ שגיאה: ' + e.message;
+      }
+
+      document.getElementById('progressWrap').style.display = 'none';
+      document.getElementById('sendBtn').disabled = false;
+      document.getElementById('sendLabel').textContent = '📤 שלח לקבוצות הנבחרות';
+    }
+
+    let qrPollTimer = null;
+
+    async function openQR() {
+      document.getElementById('qrModal').style.display = 'flex';
+      document.getElementById('qrWrap').style.display = 'none';
+      document.getElementById('qrStatusMsg').textContent = 'טוען קוד QR...';
+      await pollQR();
+      qrPollTimer = setInterval(pollQR, 3000);
+    }
+
+    function closeQR() {
+      document.getElementById('qrModal').style.display = 'none';
+      if (qrPollTimer) { clearInterval(qrPollTimer); qrPollTimer = null; }
+    }
+
+    async function pollQR() {
+      try {
+        const r = await fetch('/api/qr');
+        const d = await r.json();
+        if (d.status === 'authenticated' || d.status === 'ready') {
+          document.getElementById('qrWrap').style.display = 'none';
+          document.getElementById('qrStatusMsg').textContent = '✅ WhatsApp מחובר! אפשר לסגור';
+          document.getElementById('statusDot').className = 'dot online';
+          document.getElementById('statusText').textContent = '✅ WhatsApp מחובר';
+          if (qrPollTimer) { clearInterval(qrPollTimer); qrPollTimer = null; }
+        } else if (d.qrDataUrl) {
+          document.getElementById('qrImg').src = d.qrDataUrl;
+          document.getElementById('qrWrap').style.display = 'inline-block';
+          document.getElementById('qrStatusMsg').textContent = 'סרוק את הקוד עם WhatsApp';
+        } else {
+          document.getElementById('qrStatusMsg').textContent = '⏳ ' + (d.status || 'ממתין לחיבור...');
+        }
+      } catch (e) {
+        document.getElementById('qrStatusMsg').textContent = '❌ שגיאה: ' + e.message;
+      }
+    }
+
+    checkStatus();
+    loadGroups();
+    setInterval(checkStatus, 15000);
+  </script>
+</body>
+</html>`;
+
+// ── Server ───────────────────────────────────────────────────────────────────
+const server = http.createServer(async (req, res) => {
+  const url = req.url || '/';
+
+  if (url === '/' || url === '/index.html') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(HTML);
+    return;
+  }
+
+  // Proxy API calls to ClawdAgent
+  if (url === '/api/status') {
+    try { const d = await apiCall('/whatsapp/status'); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(d)); } catch (e) { res.writeHead(500); res.end(JSON.stringify({ error: e.message })); }
+    return;
+  }
+
+  if (url === '/api/groups') {
+    try { const d = await apiCall('/whatsapp/groups'); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(d)); } catch (e) { res.writeHead(500); res.end(JSON.stringify({ error: e.message })); }
+    return;
+  }
+
+  if (url === '/api/qr') {
+    try { const d = await apiCall('/whatsapp/qr'); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(d)); } catch (e) { res.writeHead(500); res.end(JSON.stringify({ error: e.message })); }
+    return;
+  }
+
+  if (url === '/api/broadcast' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const parsed = JSON.parse(body);
+        const d = await apiCall('/whatsapp/broadcast', 'POST', parsed);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(d));
+      } catch (e) { res.writeHead(500); res.end(JSON.stringify({ error: e.message })); }
+    });
+    return;
+  }
+
+  res.writeHead(404);
+  res.end('Not found');
+});
+
+server.listen(PORT, '127.0.0.1', () => {
+  console.log('✅ WhatsApp Broadcast tool running at http://localhost:' + PORT);
+});

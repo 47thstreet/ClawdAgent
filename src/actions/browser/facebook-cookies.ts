@@ -20,14 +20,8 @@ export interface ParseResult {
   error?: string;
 }
 
-/** Fields that Playwright doesn't accept — strip these from imported cookies */
-const STRIP_FIELDS = new Set(['sameSite', 'priority', 'storeId', 'id', 'session', 'hostOnly', 'firstPartyDomain']);
-
 /** Essential cookies that must be present for a valid Facebook session */
 const REQUIRED_COOKIES = ['c_user', 'xs'];
-
-/** Common Facebook cookie names for reference */
-const KNOWN_FB_COOKIES = ['c_user', 'xs', 'datr', 'fr', 'sb', 'spin', 'wd', 'presence', 'locale'];
 
 /**
  * Detect the format of the cookie input and parse accordingly.

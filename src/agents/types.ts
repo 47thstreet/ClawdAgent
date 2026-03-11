@@ -9,4 +9,7 @@ export interface AgentDefinition {
   maxTokens: number;
   temperature: number;
   maxToolIterations?: number;
+  /** When true, agent history is isolated from the main chat session.
+   *  History is keyed as `agent-<id>-<userId>` instead of the main conversationId. */
+  isolatedSession?: boolean;
 }

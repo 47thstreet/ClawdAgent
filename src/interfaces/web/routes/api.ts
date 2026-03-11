@@ -153,15 +153,39 @@ export function setupApiRoutes(engine: Engine): Router {
   });
 
   // GET /api/models — list available AI models for the model selector
-  router.get('/models', (_req: Request, res: Response) => {
+  router.get('/models', async (_req: Request, res: Response) => {
     const models = getAllModels().map(m => ({
       id: m.id, name: m.name, provider: m.provider, tier: m.tier,
       supportsHebrew: m.supportsHebrew, supportsVision: m.supportsVision,
     }));
+
+    // Fetch live Ollama models if enabled
+    const ollamaModels: typeof models = [];
+    const ollamaUrl = process.env.OLLAMA_URL ?? 'http://localhost:11434';
+    if (process.env.OLLAMA_ENABLED === 'true') {
+      try {
+        const resp = await fetch(`${ollamaUrl}/api/tags`);
+        if (resp.ok) {
+          const data = await resp.json() as { models?: { name: string }[] };
+          for (const m of data.models ?? []) {
+            ollamaModels.push({
+              id: `ollama:${m.name}`,
+              name: m.name,
+              provider: 'ollama' as any,
+              tier: 'free' as any,
+              supportsHebrew: false,
+              supportsVision: false,
+            });
+          }
+        }
+      } catch { /* Ollama not reachable */ }
+    }
+
     res.json({ models: [
       { id: 'auto', name: 'Auto', provider: 'auto', tier: 'auto', supportsHebrew: true, supportsVision: true },
       { id: 'claude-code-cli', name: 'Claude Code CLI (Opus 4.6)', provider: 'claude-code', tier: 'ultra', supportsHebrew: true, supportsVision: true },
       ...models,
+      ...ollamaModels,
     ]});
   });
 

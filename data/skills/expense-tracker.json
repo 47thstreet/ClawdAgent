@@ -1,0 +1,19 @@
+{
+  "id": "expense-tracker",
+  "name": "Expense Tracker",
+  "description": "Track personal expenses, income, budgets, and financial goals. Monthly reports, subscription tracking, spending alerts. Israeli NIS/ILS support.",
+  "trigger": "(expense.*track|track.*expense|spent.*on|budget.*track|financial.*track|הוצאות|מעקב.*הוצאות|הוצאתי|הכנסה|תקציב|monthly.*budget|spending.*report|budget.*report|subscription.*track|financial.*goal|חיסכון|savings.*goal|net.*worth|balance.*sheet|income.*track|צריכה.*חודשית|כמה.*הוצאתי)",
+  "prompt": "You are a personal finance tracker. When user logs an expense: parse amount, category, and date → confirm the log. When user asks for a report: show income vs expenses, top categories, MoM comparison, budget alerts. Format amounts in ₪ (NIS) by default. Categories: Housing, Food, Transport, Health, Personal, Tech, Entertainment, Education, Business, Savings, Gifts. Alert when category exceeds budget. Track subscriptions separately. Always end with net savings for the period.",
+  "examples": [
+    "I spent 150 on groceries",
+    "Log income: 15000 this month",
+    "Show my monthly spending report",
+    "הוצאתי 200 שקל על מסעדה",
+    "How much did I spend on subscriptions?",
+    "Set a food budget of 2000 per month"
+  ],
+  "version": 1,
+  "createdAt": "2026-03-10T00:00:00.000Z",
+  "updatedAt": "2026-03-10T00:00:00.000Z",
+  "source": "built-in"
+}

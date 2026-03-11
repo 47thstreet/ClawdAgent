@@ -18,6 +18,18 @@ import { strategyLabPrompt } from './prompts/strategy-lab.js';
 import { aiAppBuilderPrompt } from './prompts/ai-app-builder.js';
 import { mrrStrategistPrompt } from './prompts/mrr-strategist.js';
 import { voiceAgentPrompt } from './prompts/voice-agent.js';
+// New agents
+import { whatsappAgentPrompt } from './prompts/whatsapp-agent.js';
+import { newsAgentPrompt } from './prompts/news-agent.js';
+import { emailAgentPrompt } from './prompts/email-agent.js';
+import { dataAnalystPrompt } from './prompts/data-analyst.js';
+import { personalAssistantPrompt } from './prompts/personal-assistant.js';
+import { financeTrackerPrompt } from './prompts/finance-tracker.js';
+// Subagents
+import { factCheckerPrompt } from './prompts/fact-checker.js';
+import { summarizerSubPrompt } from './prompts/summarizer-sub.js';
+import { sentimentAnalyzerPrompt } from './prompts/sentiment-analyzer.js';
+import { codeReviewerSubPrompt } from './prompts/code-reviewer-sub.js';
 
 const agents: Map<string, AgentDefinition> = new Map();
 
@@ -42,6 +54,20 @@ register({ id: 'strategy-lab', name: 'Strategy Lab', description: 'R&D agent —
 register({ id: 'ai-app-builder', name: 'AI App Builder', description: 'Builds complete revenue-generating AI applications from scratch — market validation via TrustMRR, full-stack development, Stripe payments, deployment, and launch automation.', systemPrompt: aiAppBuilderPrompt, model: 'dynamic', preferredOllamaModel: 'qwen3-coder-next', tools: ['bash', 'file', 'search', 'browser', 'github', 'docker', 'deploy', 'kie', 'social', 'memory', 'firecrawl'], maxTokens: 8192, temperature: 0.4, maxToolIterations: 25 });
 register({ id: 'mrr-strategist', name: 'MRR Strategist', description: 'Revenue strategy agent — deep market research via TrustMRR, financial modeling, pricing optimization, competitive intelligence, growth planning, and churn prevention for AI/SaaS products.', systemPrompt: mrrStrategistPrompt, model: 'dynamic', preferredOllamaModel: 'deepseek-v3.1', tools: ['search', 'browser', 'firecrawl', 'file', 'memory', 'analytics', 'social', 'email'], maxTokens: 8192, temperature: 0.5, maxToolIterations: 20 });
 register({ id: 'voice-agent', name: 'Voice Agent', description: 'Makes and receives phone calls with AI voice via Twilio + OpenAI Realtime. Call tracking, voice configuration, real-time conversation.', systemPrompt: voiceAgentPrompt, model: 'dynamic', preferredOllamaModel: 'minimax-m2.5', tools: ['voice', 'memory'], maxTokens: 4096, temperature: 0.3, maxToolIterations: 10 });
+
+// ─── New Agents ───────────────────────────────────────────────────
+register({ id: 'whatsapp-agent', name: 'WhatsApp Agent', description: 'Dedicated WhatsApp operator — send messages, manage groups, broadcast updates, monitor conversations, and handle all WhatsApp communications autonomously.', systemPrompt: whatsappAgentPrompt, model: 'dynamic', preferredOllamaModel: 'gemma3-1b', tools: ['whatsapp', 'memory'], maxTokens: 4096, temperature: 0.4, maxToolIterations: 15, isolatedSession: true });
+register({ id: 'news-agent', name: 'News Agent', description: 'Aggregates news, monitors keywords, sends digests, and alerts on breaking stories. Tracks user topics and delivers concise multi-source summaries.', systemPrompt: newsAgentPrompt, model: 'dynamic', preferredOllamaModel: 'deepseek-v3.1', tools: ['search', 'scrape', 'memory', 'cron', 'rag'], maxTokens: 4096, temperature: 0.5, maxToolIterations: 12 });
+register({ id: 'email-agent', name: 'Email Agent', description: 'Drafts, composes, and manages email communications. Summarizes threads, extracts action items, writes cold outreach, follow-ups, proposals, and replies.', systemPrompt: emailAgentPrompt, model: 'dynamic', preferredOllamaModel: 'minimax-m2.5', tools: ['email', 'memory', 'search'], maxTokens: 4096, temperature: 0.6, maxToolIterations: 10 });
+register({ id: 'data-analyst', name: 'Data Analyst', description: 'Analyzes CSV, JSON, and database data. Runs SQL queries, calculates statistics, detects trends and anomalies, builds reports. Business intelligence and KPI tracking.', systemPrompt: dataAnalystPrompt, model: 'dynamic', preferredOllamaModel: 'qwen3-coder-next', tools: ['bash', 'file', 'db', 'memory'], maxTokens: 8192, temperature: 0.3, maxToolIterations: 15 });
+register({ id: 'personal-assistant', name: 'Personal Assistant', description: 'Manages tasks, reminders, habits, goals, and daily briefings. Your autonomous life manager — never lets you forget anything. Proactive nudges, weekly reviews.', systemPrompt: personalAssistantPrompt, model: 'dynamic', preferredOllamaModel: 'minimax-m2.5', tools: ['task', 'reminder', 'cron', 'memory', 'search', 'email', 'workflow'], maxTokens: 4096, temperature: 0.5, maxToolIterations: 12 });
+register({ id: 'finance-tracker', name: 'Finance Tracker', description: 'Tracks income, expenses, budgets, and financial goals. Monthly reports, spending alerts, subscription tracking. Israeli financial context (NIS, VAT, Israeli banks).', systemPrompt: financeTrackerPrompt, model: 'dynamic', preferredOllamaModel: 'minimax-m2.5', tools: ['memory', 'file', 'bash'], maxTokens: 4096, temperature: 0.3, maxToolIterations: 10 });
+
+// ─── Subagents ────────────────────────────────────────────────────
+register({ id: 'fact-checker', name: 'Fact Checker', description: 'Subagent: Verifies claims, statements, and information. Returns verdict (TRUE/FALSE/PARTIAL/UNVERIFIABLE) with evidence and confidence score. Called by other agents for claim verification.', systemPrompt: factCheckerPrompt, model: 'dynamic', preferredOllamaModel: 'deepseek-v3.1', tools: ['search', 'scrape'], maxTokens: 2048, temperature: 0.1, maxToolIterations: 8 });
+register({ id: 'summarizer', name: 'Summarizer', description: 'Subagent: Distills long content into structured summaries. Handles articles, threads, meetings, code, and conversations. Multiple output formats: executive, detailed, action-item-focused.', systemPrompt: summarizerSubPrompt, model: 'dynamic', preferredOllamaModel: 'minimax-m2.5', tools: [], maxTokens: 2048, temperature: 0.3, maxToolIterations: 5 });
+register({ id: 'sentiment-analyzer', name: 'Sentiment Analyzer', description: 'Subagent: Analyzes sentiment, tone, and emotions in text. Supports social media, reviews, news, emails. Market sentiment for trading. Hebrew/English/mixed text. Sarcasm detection.', systemPrompt: sentimentAnalyzerPrompt, model: 'dynamic', preferredOllamaModel: 'minimax-m2.5', tools: [], maxTokens: 2048, temperature: 0.2, maxToolIterations: 5 });
+register({ id: 'code-reviewer', name: 'Code Reviewer', description: 'Subagent: Fast focused code reviews. Detects security vulnerabilities, bugs, performance issues, TypeScript anti-patterns. Returns structured findings by severity (CRITICAL/HIGH/MEDIUM/LOW) with fixes.', systemPrompt: codeReviewerSubPrompt, model: 'dynamic', preferredOllamaModel: 'qwen3-coder-next', tools: ['file'], maxTokens: 4096, temperature: 0.2, maxToolIterations: 8 });
 
 export function getAgent(id: string): AgentDefinition | undefined { return agents.get(id); }
 export function getAllAgents(): AgentDefinition[] { return Array.from(agents.values()); }

@@ -447,7 +447,6 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
 
   // Wire subsystems into heartbeat
   heartbeat.setSubsystems({
-    meta: engine.getMetaAgent(),
     selfRepair,
     goals: engine.getGoalEngine(),
     planner: engine.getGoalPlanner(),
@@ -633,6 +632,57 @@ Rules:
     return `LinkedIn agent started for ${account.name}`;
   });
 
+  // ─── New Cron Action Handlers ──────────────────────────────────
+
+  /** morning_briefing — personalised daily briefing (tasks + goals + habits + news) */
+  cronEngine.registerAction('morning_briefing', async (task) => {
+    try {
+      const response = await engine.getAIClient().chat({
+        systemPrompt: 'You are ClawdAgent. Generate a concise, motivating morning briefing. Include: today\'s tasks (by priority), upcoming deadlines, goal progress, habits to complete, and one proactive tip. Use emojis. Keep it under 300 words.',
+        messages: [{ role: 'user', content: `Generate morning briefing for user ${task.userId}. Context: ${JSON.stringify(task.actionData)}` }],
+        maxTokens: 600, temperature: 0.6,
+      });
+      return response.content;
+    } catch { return '🌅 Good morning! Your briefing is ready. Check your tasks and goals for today.'; }
+  });
+
+  /** evening_summary — end-of-day recap with completed tasks, remaining items, tomorrow prep */
+  cronEngine.registerAction('evening_summary', async (task) => {
+    try {
+      const response = await engine.getAIClient().chat({
+        systemPrompt: 'You are ClawdAgent. Generate a concise evening summary. Include: tasks completed today, what\'s still pending, top priority for tomorrow, and one reflection/tip. Use emojis. Keep it under 250 words.',
+        messages: [{ role: 'user', content: `Generate evening summary for user ${task.userId}. Context: ${JSON.stringify(task.actionData)}` }],
+        maxTokens: 500, temperature: 0.6,
+      });
+      return response.content;
+    } catch { return '🌙 Good evening! Great work today. Check tomorrow\'s priorities and get some rest.'; }
+  });
+
+  /** weekly_report — Monday morning report: goals, habits, tasks, and top priorities for the week */
+  cronEngine.registerAction('weekly_report', async (task) => {
+    try {
+      const response = await engine.getAIClient().chat({
+        systemPrompt: 'You are ClawdAgent. Generate a weekly planning report for Monday morning. Include: key goals for the week, habit streaks, overdue tasks to clear, and 3 top priorities to focus on. Be concise and motivating. Use emojis.',
+        messages: [{ role: 'user', content: `Generate weekly report for user ${task.userId}. Week starting: ${new Date().toLocaleDateString()}` }],
+        maxTokens: 600, temperature: 0.6,
+      });
+      return response.content;
+    } catch { return '📅 New week, new goals! Check your top 3 priorities and let\'s get moving.'; }
+  });
+
+  /** crypto_market_scan — hourly crypto market overview: top movers, sentiment, key levels */
+  cronEngine.registerAction('crypto_market_scan', async (task) => {
+    try {
+      const pairs = (task.actionData?.pairs as string[]) ?? ['BTC', 'ETH', 'SOL'];
+      const response = await engine.getAIClient().chat({
+        systemPrompt: 'You are ClawdAgent\'s crypto analyst. Provide a brief market scan. Summarize overall market sentiment, top movers, and any key levels to watch. Keep it under 200 words. Use emojis.',
+        messages: [{ role: 'user', content: `Market scan for: ${pairs.join(', ')}. Timestamp: ${new Date().toISOString()}` }],
+        maxTokens: 400, temperature: 0.4,
+      });
+      return response.content;
+    } catch { return '📊 Crypto market scan: Data temporarily unavailable. Check your exchange directly.'; }
+  });
+
   // Register default workflow action handlers
   workflowEngine.registerHandler('send_message', async (config) => {
     return `Message: ${config.message ?? 'ok'}`;
@@ -670,6 +720,29 @@ Rules:
     }
   }
 
+  // ─── Bootstrap Default System Cron Jobs ──────────────────────────
+  // These run once at startup and are idempotent (skip if already exists)
+  const defaultCronJobs: Array<{ id: string; name: string; expression: string; action: string; actionData: Record<string, unknown> }> = [
+    { id: 'sys_morning_briefing', name: 'Morning Briefing', expression: '0 8 * * *',  action: 'morning_briefing',  actionData: {} },
+    { id: 'sys_evening_summary',  name: 'Evening Summary',  expression: '0 20 * * *', action: 'evening_summary',   actionData: {} },
+    { id: 'sys_weekly_report',    name: 'Weekly Report',    expression: '0 9 * * 1',  action: 'weekly_report',     actionData: {} },
+    { id: 'sys_crypto_scan',      name: 'Crypto Market Scan', expression: '0 * * * *', action: 'crypto_market_scan', actionData: { pairs: ['BTC', 'ETH', 'SOL'] } },
+  ];
+
+  const existingTaskIds = new Set(cronEngine.listTasks().map(t => t.id));
+  for (const job of defaultCronJobs) {
+    if (!existingTaskIds.has(job.id)) {
+      await cronEngine.addTask({
+        ...job,
+        userId: 'system',
+        platform: 'web',
+        enabled: false, // disabled by default — user opts in via dashboard
+        createdAt: new Date().toISOString(),
+      }).catch(err => logger.warn(`Default cron setup failed: ${job.id}`, { error: String(err) }));
+      logger.info(`📅 Default cron job registered: ${job.name} (disabled — enable via dashboard)`);
+    }
+  }
+
   // Wire cron tool to engine so AI can manage cron tasks
   setCronToolEngine(cronEngine);
 
@@ -682,7 +755,7 @@ Rules:
   setRAGEngineRef(ragEngine);
 
   // Now create ProactiveThinker (needs cronEngine)
-  const proactiveThinker = new ProactiveThinker({
+  new ProactiveThinker({
     aiChat: aiChatHelper,
     getSystemStatus: async () => {
       const uptime = process.uptime();

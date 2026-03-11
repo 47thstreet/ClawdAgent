@@ -2,7 +2,7 @@
  * Facebook Agent API routes — control autonomous Facebook agents.
  */
 import { Router, Request, Response } from 'express';
-import { FacebookAgent, type AgentConfig, type ActionType } from '../../../actions/browser/facebook-agent.js';
+import { FacebookAgent, type AgentConfig } from '../../../actions/browser/facebook-agent.js';
 import { FacebookAccountManager } from '../../../actions/browser/facebook-manager.js';
 import logger from '../../../utils/logger.js';
 

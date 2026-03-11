@@ -116,9 +116,10 @@ For complex forms: fill_form action with {selector: value} pairs is most efficie
 
 export class SkillsEngine {
   private skills: Map<string, Skill> = new Map();
-  private initialized = false;
+  private _initialized = false;
 
   async init() {
+    if (this._initialized) return;
     // Load built-in skills
     for (const skill of BUILT_IN_SKILLS) {
       this.skills.set(skill.id, skill);
@@ -126,7 +127,7 @@ export class SkillsEngine {
 
     // Load learned/user-created skills from disk
     await this.loadFromDisk();
-    this.initialized = true;
+    this._initialized = true;
     logger.info(`🎯 Skills engine initialized: ${this.skills.size} skills loaded`);
   }
 
