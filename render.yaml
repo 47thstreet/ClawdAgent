@@ -1,3 +1,9 @@
+databases:
+  - name: clawdagent-db
+    plan: free
+    databaseName: clawdagent
+    user: clawdagent
+
 services:
   - type: web
     name: clawdagent
@@ -15,9 +21,9 @@ services:
       - key: BIND_HOST
         value: "0.0.0.0"
       - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
-        sync: false
+        fromDatabase:
+          name: clawdagent-db
+          property: connectionString
       - key: JWT_SECRET
         generateValue: true
       - key: ENCRYPTION_KEY
