@@ -5,9 +5,9 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml* ./
+COPY package.json pnpm-lock.yaml ./
 
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 # ---------- Stage: web-build ----------
 FROM node:20-alpine AS web-build
@@ -51,12 +51,11 @@ COPY --from=build /app/package.json ./package.json
 # Copy web dashboard build
 COPY --from=web-build /app/web/dist ./web/dist
 
-# Copy config and tracked data files
+# Copy config files (behaviors, etc.)
 COPY config/ ./config/
-COPY data/skills/ ./data/skills/
 
 # Create required directories
-RUN mkdir -p logs data/projects data/conversations data/memory plugins
+RUN mkdir -p logs data/skills data/projects plugins
 
 EXPOSE 3000
 

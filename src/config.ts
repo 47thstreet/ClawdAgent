@@ -153,7 +153,7 @@ const configSchema = z.object({
 
   // Security
   ADMIN_IP_WHITELIST: z.string().optional().transform(v => v?.split(',').map(s => s.trim()).filter(Boolean) ?? []),
-  BIND_HOST: z.string().default('127.0.0.1'), // Bind to localhost only by default — prevents Shodan-style discovery
+  BIND_HOST: z.string().default(process.env.RENDER ? '0.0.0.0' : '127.0.0.1'), // 0.0.0.0 on Render so reverse proxy can reach us
   REQUIRE_HTTPS: z.string().default('false').transform(v => v === 'true'),
 });
 
