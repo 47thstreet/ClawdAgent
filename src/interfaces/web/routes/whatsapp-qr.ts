@@ -841,6 +841,57 @@ export function setupWhatsAppQRRoutes(): Router {
   });
 
   /**
+   * POST /api/whatsapp/broadcast
+   *
+   * Send the same message to multiple chats (groups or DMs).
+   * Used by the WhatsApp Broadcast UI.
+   *
+   * Body: { chatIds: string[], message: string }
+   * Response: { sent: number, failed: number, errors?: string[] }
+   */
+  router.post('/broadcast', async (req: Request, res: Response) => {
+    const client = getWAClient();
+    if (!client) {
+      res.status(503).json({ error: 'WhatsApp is not connected. Scan the QR code first.' });
+      return;
+    }
+
+    const { chatIds, message } = req.body as { chatIds?: string[]; message?: string };
+    if (!chatIds || !Array.isArray(chatIds) || chatIds.length === 0) {
+      res.status(400).json({ error: 'chatIds must be a non-empty array' });
+      return;
+    }
+    if (!message || typeof message !== 'string') {
+      res.status(400).json({ error: 'message is required and must be a string' });
+      return;
+    }
+    if (chatIds.length > 50) {
+      res.status(400).json({ error: 'Maximum 50 chats per broadcast' });
+      return;
+    }
+
+    let sent = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const chatId of chatIds) {
+      try {
+        await client.sendMessage(chatId, message);
+        sent++;
+        // Delay between sends to avoid WhatsApp rate limiting
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      } catch (err: any) {
+        failed++;
+        errors.push(`${chatId}: ${err.message}`);
+        logger.error('Broadcast send failed', { chatId, error: err.message });
+      }
+    }
+
+    logger.info('WhatsApp broadcast completed', { sent, failed, total: chatIds.length });
+    res.json({ sent, failed, ...(errors.length > 0 ? { errors } : {}) });
+  });
+
+  /**
    * POST /api/whatsapp/watcher/stop
    * Stop the watcher.
    */
