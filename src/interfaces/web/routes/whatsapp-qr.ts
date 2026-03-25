@@ -830,6 +830,56 @@ export function setupWhatsAppQRRoutes(): Router {
     }
   });
 
+  /**
+   * POST /api/whatsapp/broadcast-events
+   *
+   * Fetch upcoming events from Kartis and broadcast to selected groups.
+   *
+   * Body: { chatIds: string[], maxEvents?: number, delayMs?: number }
+   * Response: { results: Array<{ chatId, success, error? }>, sent, failed, total, message }
+   */
+  router.post('/broadcast-events', async (req: Request, res: Response) => {
+    const client = getWAClient();
+    if (!client) { res.status(503).json({ error: 'WhatsApp is not connected.' }); return; }
+
+    const { chatIds, maxEvents, delayMs } = req.body as {
+      chatIds?: string[];
+      maxEvents?: number;
+      delayMs?: number;
+    };
+
+    if (!Array.isArray(chatIds) || chatIds.length === 0) {
+      res.status(400).json({ error: 'chatIds must be a non-empty array' }); return;
+    }
+    if (chatIds.length > 50) {
+      res.status(400).json({ error: 'Maximum 50 recipients per broadcast' }); return;
+    }
+
+    try {
+      const message = await formatEventsForBroadcast(maxEvents ?? 5);
+      const delay = Math.max(200, delayMs ?? 500);
+      const results: Array<{ chatId: string; success: boolean; error?: string }> = [];
+
+      for (const chatId of chatIds) {
+        try {
+          await client.sendMessage(chatId, message);
+          results.push({ chatId, success: true });
+        } catch (err: any) {
+          results.push({ chatId, success: false, error: err.message });
+          logger.warn('Event broadcast failed for chat', { chatId, error: err.message });
+        }
+        await new Promise(r => setTimeout(r, delay));
+      }
+
+      const sent = results.filter(r => r.success).length;
+      logger.info('WhatsApp event broadcast complete', { sent, total: chatIds.length });
+      res.json({ results, sent, failed: chatIds.length - sent, total: chatIds.length, message });
+    } catch (err: any) {
+      logger.error('Failed to broadcast events', { error: err.message });
+      res.status(500).json({ error: `Failed to broadcast events: ${err.message}` });
+    }
+  });
+
   // ─── Group Link Watcher ───────────────────────────────────────────────────
 
   /**
