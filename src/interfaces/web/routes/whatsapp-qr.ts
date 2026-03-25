@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { getLatestQR, getWhatsAppStatus, generateQRDataURL, getWAClient } from '../../whatsapp/auth.js';
 import logger from '../../../utils/logger.js';
 import { groupLinkWatcher } from '../../../actions/whatsapp/group-link-watcher.js';
+import { formatEventsForBroadcast } from '../../../services/event-recommender.js';
 
 /** Extract invite code from a full https://chat.whatsapp.com/XYZ URL or bare code */
 function parseInviteCode(raw: string): string {

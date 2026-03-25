@@ -4,6 +4,7 @@ import { Engine, IncomingMessage } from '../../core/engine.js';
 import config from '../../config.js';
 import logger from '../../utils/logger.js';
 import { formatCostFooter } from '../../core/usage-tracker.js';
+import { getRecommendation } from '../../services/event-recommender.js';
 
 /** File extension → mimetype map for document handling */
 const DOCUMENT_EXTS: Record<string, string> = {
@@ -55,18 +56,30 @@ export function setupHandlers(client: WAClient, engine: Engine) {
       if (!wasMentioned && !hasPrefix) {
         // Party keyword auto-responder — reply with Kartis ticket link
         const PARTY_KEYWORDS = [
-          'כרטיס', 'כרטיסים', 'טיקט', 'טיקטים', 'כמה עולה', 'כמה זה עולה',
+          // English
+          'party', 'event', 'tonight', 'this weekend', 'thursday', 'friday', 'saturday',
+          'club', 'nightlife', 'table', 'vip', 'bottle', 'guestlist', 'guest list', 'rsvp',
           'ticket', 'tickets', 'how much', 'buy ticket', 'where to buy',
-          'מסיבה', 'אירוע', 'thebestparties', 'kartis',
+          'thebestparties', 'kartis',
+          // Hebrew
+          'כרטיס', 'כרטיסים', 'טיקט', 'טיקטים', 'כמה עולה', 'כמה זה עולה',
+          'מסיבה', 'אירוע', 'מסיבות', 'אירועים', 'הערב', 'סוף שבוע',
+          'מועדון', 'שולחן', 'בקבוק', 'רשימת אורחים',
           'איפה קונים', 'איפה אפשר', 'קנות כרטיס', 'לקנות כרטיס',
         ];
         const bodyLower = msg.body.toLowerCase();
         const isPartyQuery = PARTY_KEYWORDS.some(kw => bodyLower.includes(kw.toLowerCase()));
         if (isPartyQuery) {
-          logger.info('WhatsApp party keyword detected — auto-replying', { group: chat?.name, from: msg.author ?? msg.from });
-          await msg.reply(
-            '🎉 *כרטיסים לאירוע?*\n\nרכשו כרטיסים דרך אפליקציית *Kartis* ➡️ https://thebestparties.co.il\n\n_The Best Parties 🐙_'
-          ).catch(() => {});
+          logger.info('WhatsApp party keyword detected — fetching event recommendation', { group: chat?.name, from: msg.author ?? msg.from });
+          try {
+            const recommendation = await getRecommendation(msg.body);
+            await msg.reply(recommendation);
+          } catch (err: any) {
+            logger.error('Event recommendation failed, sending fallback', { error: err.message });
+            await msg.reply(
+              '🎉 *כרטיסים לאירוע?*\n\nרכשו כרטיסים דרך אפליקציית *Kartis* ➡️ https://thebestparties.co.il\n\n_The Best Parties 🐙_'
+            ).catch(() => {});
+          }
         } else {
           logger.debug('WhatsApp group message (not mentioned, skipping)', {
             group: chat?.name,

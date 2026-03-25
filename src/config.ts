@@ -134,6 +134,9 @@ const configSchema = z.object({
   OPENCLAW_DEVICE_PRIVATE_KEY: z.string().optional(),
   OPENCLAW_DEVICE_TOKEN: z.string().optional(),
 
+  // Kartis events API (The Best Parties)
+  KARTIS_EVENTS_URL: z.string().default('https://kartis-astro.vercel.app/api/cms/public-events'),
+
   // Appium (Android mobile automation)
   APPIUM_URL: z.string().default('http://localhost:4723'),
 
